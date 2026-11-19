@@ -80,7 +80,7 @@ export default function Home() {
   const exportData = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(profile, null, 2)], { type: "application/json" })), a = document.createElement("a"); a.href = url; a.download = "青览-资金档案.json"; a.click(); URL.revokeObjectURL(url); setToast("资金档案已导出。"); };
   const factorsReady = market?.mode !== "snapshot" && !networkError && quoteFresh(g?.asOf, now) && quoteFresh(dxy?.asOf, now) && Math.abs(Date.parse(g?.asOf || "") - Date.parse(dxy?.asOf || "")) <= 300000;
   const factors = [
-    { title: "美元与黄金", icon: Globe2, tag: "相关线索", fact: factorsReady && g && dxy ? `黄金 ${g.change >= 0 ? "+" : ""}${g.change.toFixed(2)}%，美元指数 ${dxy.change >= 0 ? "+" : ""}${dxy.change.toFixed(2)}%。` : "缺少新鲜且同步的报价，暂不判断当日方向。", text: factorsReady && g && dxy ? g.change * dxy.change < 0 ? "两者反向变化，与美元计价效应一致；尚不能确认是今天涨跌的主要原因。" : "两者同向变化，美元强弱不足以解释行情，还需结合实际利率与资金流。" : "美元变化会影响黄金的购买成本，相关关系只能辅助解释。" },
+    { title: "美元与黄金", icon: Globe2, tag: "相关线索", fact: factorsReady && g && dxy ? `黄金 ${g.change >= 0 ? "+" : ""}${g.change.toFixed(2)}%，美元指数 ${dxy.change >= 0 ? "+" : ""}${dxy.change.toFixed(2)}%。` : "缺少新鲜且同步的报价，暂不判断当日方向。", text: factorsReady && g && dxy ? Math.abs(g.change) < 0.005 || Math.abs(dxy.change) < 0.005 ? "至少一项涨跌幅显示为0.00%，当前精度不足以比较方向；还需核对报价与其他证据。" : g.change * dxy.change < 0 ? "两者反向变化，与美元计价效应一致；尚不能确认是今天涨跌的主要原因。" : "两者同向变化，美元强弱不足以解释行情，还需结合实际利率与资金流。" : "美元变化会影响黄金的购买成本，相关关系只能辅助解释。" },
     { title: "利率与宏观事件", icon: Landmark, tag: "待补证据", fact: "官方发布区用于核对原始公告；实时利率、通胀数值与完整新闻流尚未接入。", text: "实际利率影响黄金持有成本与成长股估值。公告标题和时间不能单独证明今天涨跌的原因。" },
     { title: "汇率与你的收益", icon: TrendingUp, tag: "传导机制", fact: goldPrice ? `现货理论折算约 ${money(goldPrice, 2)} 元/克。` : "人民币参考价等待同步金价与汇率。", text: "境内金价还受溢价与点差影响；QDII人民币收益同时受海外资产、汇率及费用影响。" },
   ];

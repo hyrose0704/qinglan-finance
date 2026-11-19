@@ -15,6 +15,8 @@ export function useLocalAssistant() {
   const [status, setStatus] = useState<LocalStatus>({ accounts: [], login: null });
   const [accountId, setAccountId] = useState(""), [models, setModels] = useState<LocalModel[]>([]);
   const [cached, setCached] = useState(lastAccount), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  const [pairUrl, setPairUrl] = useState("");
+  const [loginUrl, setLoginUrl] = useState("");
   const loginPopup = useRef<Window | null>(null), pairCleanup = useRef<(() => void) | null>(null);
   const refreshRef = useRef<() => Promise<void>>(async () => {});
   const account = status.accounts.find(item => item.id === accountId);
@@ -46,23 +48,32 @@ export function useLocalAssistant() {
   }
 
   async function connect() {
-    if (busy) return; setBusy(true); setError(""); setNotice("");
+    if (busy) return; setBusy(true); setError(""); setNotice(""); setPairUrl("");
     const popup = window.open("about:blank", "qinglan-local-connect", "width=600,height=650");
     try {
-      if (!popup) throw new Error("请允许青览打开连接窗口，然后重试。");
       const health = await fetch(`${LOCAL_ASSISTANT_ORIGIN}/health`, { signal: AbortSignal.timeout(5000), credentials: "omit", cache: "no-store", redirect: "error" });
       if (!health.ok || (await health.json()).app !== "qinglan-local-assistant") throw new Error("本机助手尚未就绪。");
       const state = crypto.randomUUID(), url = new URL(`${LOCAL_ASSISTANT_ORIGIN}/connect`);
       url.searchParams.set("origin", window.location.origin); url.searchParams.set("state", state);
+      setPairUrl(url.toString());
       const session = await new Promise<string>((resolve, reject) => {
-        let timer: ReturnType<typeof setTimeout>;
-        const cleanup = () => { clearTimeout(timer); window.removeEventListener("message", receive); pairCleanup.current = null; };
+        let timer: ReturnType<typeof setTimeout>, poll: ReturnType<typeof setTimeout>, stopped = false;
+        const cleanup = () => { stopped = true; clearTimeout(timer); clearTimeout(poll); window.removeEventListener("message", receive); pairCleanup.current = null; };
+        const accept = (token: unknown) => { if (!stopped && typeof token === "string" && /^[\w-]{43}$/.test(token)) { cleanup(); resolve(token); } };
         const receive = (event: MessageEvent) => {
-          if (event.origin !== LOCAL_ASSISTANT_ORIGIN || event.source !== popup || event.data?.type !== "qinglan-local-connected" || event.data.state !== state || !/^[\w-]{43}$/.test(event.data.token || "")) return;
-          cleanup(); resolve(event.data.token);
+          if (event.origin !== LOCAL_ASSISTANT_ORIGIN || event.source !== popup || event.data?.type !== "qinglan-local-connected" || event.data.state !== state) return;
+          accept(event.data.token);
+        };
+        const claim = async () => {
+          try {
+            const response = await fetch(`${LOCAL_ASSISTANT_ORIGIN}/connect/claim`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ state }), credentials: "omit", redirect: "error", cache: "no-store", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(5000) });
+            if (response.ok) accept((await response.json()).token);
+          } catch { /* A temporary local connection failure can recover before pairing expires. */ }
+          if (!stopped) poll = setTimeout(() => void claim(), 1500);
         };
         window.addEventListener("message", receive); timer = setTimeout(() => { cleanup(); reject(new Error("连接确认已超时，请重新连接本机助手。")); }, 120000);
-        pairCleanup.current = cleanup; popup.location.href = url.toString();
+        pairCleanup.current = () => { cleanup(); popup?.close(); reject(new Error("已取消本次连接。")); };
+        if (popup) popup.location.href = url.toString(); void claim();
       });
       capability.current = session; setConnected(true);
       const next = await readLocalStatus(session); setStatus(next);
@@ -71,18 +82,17 @@ export function useLocalAssistant() {
       setNotice("已连接本机程序。请选择已保存账号，或继续官方登录。");
     } catch (value) {
       popup?.close(); setError(value instanceof Error && value.name !== "TypeError" ? value.message : "本机助手未启动或浏览器尚未允许本机访问。请先启动程序，再重新连接。");
-    } finally { setBusy(false); }
+    } finally { setBusy(false); setPairUrl(""); }
   }
 
   async function login(newAccount = false) {
     if (!capability.current || busy) return; setBusy(true); setError("");
     const popup = window.open("about:blank", "qinglan-openai-login", "width=650,height=760");
     try {
-      if (!popup) throw new Error("请允许青览打开官方登录窗口后重试。");
       const result = await localRequest<{ authUrl: string }>(capability.current, "/api/login", { accountId: newAccount ? null : accountId || null });
       const url = new URL(result.authUrl);
       if (url.origin !== "https://auth.openai.com") throw new Error("官方登录地址不符合预期。");
-      loginPopup.current = popup; popup.location.href = result.authUrl;
+      setLoginUrl(result.authUrl); loginPopup.current = popup; if (popup) popup.location.href = result.authUrl;
       setNotice("请在 OpenAI 官方窗口选择账号并授权。完成后返回此处刷新账号状态。");
       setStatus(previous => ({ ...previous, login: { pending: true, error: "", accountId: "" } }));
     } catch (value) { popup?.close(); setError(value instanceof Error ? value.message : "无法开始官方登录。"); }
@@ -120,8 +130,10 @@ export function useLocalAssistant() {
     if (!connected || !status.login?.pending) return;
     const timer = setInterval(() => void refreshRef.current(), 5000); return () => clearInterval(timer);
   }, [connected, status.login?.pending]);
+  useEffect(() => { if (!status.login?.pending) setLoginUrl(""); }, [status.login?.pending]);
   useEffect(() => () => pairCleanup.current?.(), []);
 
-  return { connected, busy, status, account, accountId, models, cached, error, notice, connect, login, chooseAccount, refresh, signOut, disconnect,
+  return { connected, busy, status, account, accountId, models, cached, error, notice, pairUrl, loginUrl, connect, login, chooseAccount, refresh, signOut, disconnect,
+    cancelPair: () => pairCleanup.current?.(),
     ask: (model: string, messages: ReturnType<typeof createChatMessages>, signal?: AbortSignal) => askLocalAssistant(capability.current, accountId, model, messages, signal) };
 }

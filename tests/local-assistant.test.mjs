@@ -134,8 +134,13 @@ test("the loopback server requires explicit pairing and rejects unrelated web or
     assert.equal(forbidden.status, 403); assert.equal(forbidden.headers.get("access-control-allow-origin"), null);
     const opened = await fetch(`${base}/connect?origin=${encodeURIComponent(origin)}&state=fixture-state-1234567890`);
     const html = await opened.text(), nonce = html.match(/name="nonce" value="([^"]+)"/)[1];
+    const claimRequest = source => fetch(`${base}/connect/claim`, { method: "POST", headers: { Origin: source, "Content-Type": "application/json" }, body: JSON.stringify({ state: new URL(opened.url).searchParams.get("state") }) });
+    assert.deepEqual(await (await claimRequest(origin)).json(), { pending: true });
     const approval = await fetch(`${base}/connect/approve`, { method: "POST", headers: { Origin: LOCAL_ASSISTANT_ORIGIN, Cookie: `qinglan_pair=${nonce}`, "Content-Type": "application/x-www-form-urlencoded" }, body: `nonce=${nonce}` });
     const confirmation = await approval.text(), session = confirmation.match(/"token":"([^"]+)"/)[1];
+    assert.equal((await claimRequest("https://unrelated.example")).status, 403);
+    assert.equal((await (await claimRequest(origin)).json()).token, session);
+    assert.deepEqual(await (await claimRequest(origin)).json(), { pending: true });
     const allowed = await fetch(`${base}/api/status`, { headers: { Origin: origin, Authorization: `Bearer ${session}` } });
     assert.equal(allowed.status, 200); assert.deepEqual(await allowed.json(), { accounts: [] });
     const repeated = await fetch(`${base}/connect/approve`, { method: "POST", headers: { Origin: LOCAL_ASSISTANT_ORIGIN, Cookie: `qinglan_pair=${nonce}` }, body: `nonce=${nonce}` }); assert.equal(repeated.status, 403);

@@ -26,7 +26,7 @@ function page(response, title, content, script = "") {
 }
 
 export function createLocalServer(accounts, { port = LOCAL_ASSISTANT_PORT, staticRoot = root } = {}) {
-  const sessions = new Map(), approvals = new Map(); let busy = false;
+  const sessions = new Map(), approvals = new Map(), claims = new Map(); let busy = false;
   const server = http.createServer(async (request, response) => {
     response.setHeader("Cache-Control", "no-store"); response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Referrer-Policy", "no-referrer");
@@ -47,6 +47,7 @@ export function createLocalServer(accounts, { port = LOCAL_ASSISTANT_PORT, stati
         const targetOrigin = url.searchParams.get("origin"), state = url.searchParams.get("state");
         if (!LOCAL_WEB_ORIGINS.includes(targetOrigin) || !/^[\w-]{20,80}$/.test(state || "")) throw new LocalAIError("连接请求不符合预期。", 403);
         for (const [key, value] of approvals) if (value.expiresAt < Date.now()) approvals.delete(key);
+        for (const [key, value] of claims) if (value.expiresAt < Date.now()) claims.delete(key);
         if (approvals.size >= 20) throw new LocalAIError("连接请求过多，请稍后重试。", 429);
         const nonce = token(); approvals.set(nonce, { origin: targetOrigin, state, expiresAt: Date.now() + 120000 });
         response.setHeader("Set-Cookie", `qinglan_pair=${nonce}; HttpOnly; SameSite=Strict; Path=/connect; Max-Age=120`);
@@ -59,8 +60,18 @@ export function createLocalServer(accounts, { port = LOCAL_ASSISTANT_PORT, stati
         const approval = approvals.get(nonce);
         if (!approval || approval.expiresAt < Date.now() || !same(cookie, nonce)) throw new LocalAIError("连接确认已过期，请从青览重新连接。", 403);
         approvals.delete(nonce); const session = token(); sessions.set(session, { origin: approval.origin, expiresAt: Date.now() + 8 * 3600000 });
+        claims.set(approval.state, { origin: approval.origin, token: session, expiresAt: Date.now() + 120000 });
         const message = JSON.stringify({ type: "qinglan-local-connected", state: approval.state, token: session }).replaceAll("<", "\\u003c");
         page(response, "本机连接已允许", "<p>请返回青览页面，选择账号或继续官方登录。</p>", `if(window.opener){window.opener.postMessage(${message},${JSON.stringify(approval.origin)});window.close();}`); return;
+      }
+      if (url.pathname === "/connect/claim" && request.method === "POST") {
+        if (!allowed || !request.headers["content-type"]?.startsWith("application/json")) throw new LocalAIError("连接结果请求来源无效。", 403);
+        const body = await readBody(request);
+        if (!/^[\w-]{20,80}$/.test(body.state || "")) throw new LocalAIError("连接请求无效。");
+        const claim = claims.get(body.state);
+        if (!claim || claim.expiresAt < Date.now()) { claims.delete(body.state); send({ pending: true }); return; }
+        if (claim.origin !== origin) throw new LocalAIError("连接结果与请求来源不匹配。", 403);
+        claims.delete(body.state); send({ token: claim.token }); return;
       }
       if (url.pathname === "/auth/callback" && request.method === "GET") {
         const result = await accounts.callback(url.searchParams);

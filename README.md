@@ -45,6 +45,8 @@ npm run local-assistant
 3. 选择官方返回的账号和模型，在AI助手中选择“ChatGPT 本机账号”再发送问题。可保留多个账号的显示信息，重新授权、切换账号或退出。模型列表成功不等于生成成功；实际回答完整结束后才记录验证时间。
 4. 以后使用时先运行 `npm run local-assistant`。网页刷新后需重新确认本机连接；符合条件且仍有效的本机账号凭证可继续使用，过期或退出后再登录。关闭终端会停止本机服务；未设置开机启动。
 
+应用内浏览器未显示弹窗时，可点击卡片里的“打开本机确认页”或“打开OpenAI登录页”链接，在普通标签页完成。网站会等待连接或登录结果；本机连接结果只在用户确认后向原请求来源领取一次，等待2分钟超时后需重新开始。
+
 本机地址：<http://127.0.0.1:48791/>。若浏览器阻止GitHub Pages访问loopback，或未允许本地网络连接，打开本机版本 <http://127.0.0.1:48791/qinglan-finance/>；不同来源的资金档案和助手输入各自保存在浏览器中，可通过资产导入导出迁移，凭证不随导出迁移。
 
 - 使用官方[本机动态注册与登录](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)、[模型及推理](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)、[账号保存和刷新](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)流程。PKCE、state、nonce及签名验证保护授权；只使用公共 `/v1/models`、`/v1/responses` 接口，不使用ChatGPT私有网页接口。

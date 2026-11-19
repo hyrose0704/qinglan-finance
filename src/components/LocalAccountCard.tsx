@@ -13,6 +13,7 @@ export function LocalAccountCard({ local, model, selectModel }: {
       {local.cached && <p className="ai-help">上次选择：{local.cached.email} · 当前尚未连接。</p>}
       <div className="ai-local-steps"><p>先在本机项目目录运行：</p><code>npm run local-assistant</code><p>再连接本机，确认连接后进入 OpenAI 官方页面登录。</p></div>
       <button className="button primary" onClick={() => void local.connect()} disabled={local.busy}><LogIn size={16} />{local.busy ? "等待本机连接确认…" : "连接本机助手"}</button>
+      {local.pairUrl && <><p className="ai-help"><a href={local.pairUrl} target="_blank" rel="noreferrer">未看到窗口？点击打开本机确认页</a>，允许连接后返回此处，网站会自动更新。</p><button className="text-button" onClick={local.cancelPair}>取消本次连接</button></>}
       <p className="ai-help"><a href={`${LOCAL_ASSISTANT_ORIGIN}/`} target="_blank" rel="noreferrer">检查本机助手 / 打开本机版</a></p>
     </> : <>
       {!!local.status.accounts.length && <label className="ai-field"><span>选择本机保存的账号</span><select aria-label="选择本机保存的账号" value={local.accountId} onChange={event => void local.chooseAccount(event.target.value)} disabled={local.busy}>
@@ -29,6 +30,7 @@ export function LocalAccountCard({ local, model, selectModel }: {
     {local.error && <p className="warning-box" role="alert">{local.error}</p>}
     {local.notice && <p className="ai-help" role="status">{local.notice}</p>}
     {local.status.login?.pending && <p className="ai-help" role="status">正在等待官方登录完成…</p>}
+    {local.loginUrl && <p className="ai-help"><a href={local.loginUrl} target="_blank" rel="noreferrer">未看到官方窗口？点击打开 OpenAI 登录页</a></p>}
     <p className="ai-help">凭证由本机程序保存，Windows 使用当前用户的系统加密保护。网页只保存上次账号显示信息；刷新后需重新连接本机。首次回答完成前，模型列表不代表推理已验证。</p>
     <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer">管理 ChatGPT 套餐用量与授权</a>
   </section>;

@@ -42,6 +42,9 @@ export function buildLearningPlan(
     preferences.horizon === "unknown" ? "用款时间" : "",
     preferences.income === "unknown" ? "收入稳定性" : "",
     preferences.experience === "unknown" ? "产品理解程度" : "",
+    profile.emergencyMonths <= 0 ? "应急金月数" : "",
+    profile.goldGrams > 0 && balances.goldPrice <= 0 ? "黄金估值单价" : "",
+    profile.fundUnits > 0 && balances.fundPrice <= 0 ? "基金估值净值" : "",
   ].filter(Boolean);
   const equityShock = Math.min(60, Math.max(10, Number(assumptions.equity) || 40)) / 100;
   const goldShock = Math.min(40, Math.max(10, Number(assumptions.gold) || 20)) / 100;

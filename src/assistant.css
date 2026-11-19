@@ -1,4 +1,11 @@
 .ai-workbench[hidden] { display: none; }
+.field input::placeholder { color: #89998f; opacity: 1; }
+.user-card { width: 100%; text-align: left; }
+.ai-local-steps { margin: 20px 0; padding: 15px 17px; background: #edf4ef; border: 1px solid #d3e3d8; border-radius: 7px; }
+.ai-local-steps p { color: #4a6754; font-size: 14px; line-height: 1.9; margin: 8px 0; }
+.ai-local-steps code { display: block; font: 15px/1.8 ui-monospace, monospace; color: #2e6443; overflow-wrap: anywhere; padding: 5px 0; }
+.ai-provider-choice { margin-bottom: 24px; }
+.ai-provider-choice .ai-field { margin-top: 0; }
 .ai-workbench { color: #294b39; }
 .ai-intro { display: flex; justify-content: space-between; align-items: center; gap: 28px; padding: 30px 32px; background: #eaf3ed; border: 1px solid #d3e2d8; border-radius: 12px; margin-bottom: 24px; }
 .ai-intro .eyebrow { color: #53755f; letter-spacing: 1px; font-size: 13px; }

@@ -1,4 +1,6 @@
 export type Risk = "steady" | "balanced" | "growth";
+export const NUMERIC_PROFILE_FIELDS = ["cash", "income", "expense", "monthlyDebt", "priorityDebt", "nearTerm", "emergencyMonths", "maxLoss", "goldGrams", "goldCost", "goldPrice", "goldBudget", "fundUnits", "fundCost", "fundPrice"] as const;
+export type NumericProfileField = typeof NUMERIC_PROFILE_FIELDS[number];
 
 export interface Profile {
   mode: "demo" | "personal";
@@ -21,7 +23,15 @@ export interface Profile {
   useFundNav: boolean;
   risk: Risk;
   savedAt?: string;
+  filledFields?: NumericProfileField[];
 }
+
+export const EMPTY_PROFILE: Profile = {
+  mode: "personal", cash: 0, income: 0, expense: 0, monthlyDebt: 0, priorityDebt: 0,
+  nearTerm: 0, emergencyMonths: 0, maxLoss: 0, goldGrams: 0, goldCost: 0, goldPrice: 0,
+  goldBudget: 0, fundUnits: 0, fundCost: 0, fundPrice: 0, useGoldQuote: false,
+  useFundNav: false, risk: "balanced", filledFields: [],
+};
 
 export const DEMO: Profile = {
   mode: "demo", cash: 60000, income: 15000, expense: 6000,
@@ -43,10 +53,11 @@ export function nonnegative(n: unknown): number {
 }
 
 export function sanitizeProfile(value: Partial<Profile>): Profile {
-  const p = { ...DEMO, ...value };
-  const numeric: (keyof Profile)[] = ["cash", "income", "expense", "monthlyDebt", "priorityDebt", "nearTerm", "emergencyMonths", "maxLoss", "goldGrams", "goldCost", "goldPrice", "goldBudget", "fundUnits", "fundCost", "fundPrice"];
-  for (const k of numeric) Object.assign(p, { [k]: nonnegative(p[k]) });
-  p.emergencyMonths = Math.min(24, Math.max(3, p.emergencyMonths));
+  const p = { ...EMPTY_PROFILE, ...value };
+  for (const k of NUMERIC_PROFILE_FIELDS) p[k] = nonnegative(p[k]);
+  p.emergencyMonths = Math.min(24, Math.max(0, p.emergencyMonths));
+  p.filledFields = Array.isArray(value.filledFields)
+    ? NUMERIC_PROFILE_FIELDS.filter(key => value.filledFields!.includes(key)) : undefined;
   p.risk = p.risk in RISK_MIX ? p.risk : "balanced";
   p.mode = p.mode === "personal" ? "personal" : "demo";
   p.useGoldQuote = p.useGoldQuote === true;
@@ -74,7 +85,9 @@ export function calculate(p: Profile, prices?: { gold?: number | null; fund?: nu
   const targetStress = target.stable * shocks.stable / 100 + target.equity * shocks.equity / 100 + target.gold * shocks.gold / 100;
   const goldRoom = Math.max(0, Math.min(p.goldBudget - p.goldCost, target.gold - goldValue));
   const riskRoom = shocks.gold > 0 ? Math.max(0, (p.maxLoss - currentStress) / (shocks.gold / 100)) : 0;
-  const conditionalGold = reserveGap > 0 || monthlyDeficit > 0 ? 0 : Math.max(0, Math.min(7000, freeCash, goldRoom, riskRoom));
+  const incomplete = p.emergencyMonths <= 0 || monthlyEssential <= 0
+    || (p.goldGrams > 0 && goldPrice <= 0) || (p.fundUnits > 0 && fundPrice <= 0);
+  const conditionalGold = incomplete || reserveGap > 0 || monthlyDeficit > 0 ? 0 : Math.max(0, Math.min(7000, freeCash, goldRoom, riskRoom));
   return { goldPrice, fundPrice, goldValue, fundValue, total, emergency, reserve, reserveGap, freeCash, longTerm, surplus, monthlyDeficit, target, currentStress, targetStress, conditionalGold,
     pnl: goldValue + fundValue - p.goldCost - p.fundCost,
     goldWeight: total > 0 ? goldValue / total * 100 : 0,

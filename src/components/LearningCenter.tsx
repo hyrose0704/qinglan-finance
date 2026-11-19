@@ -4,6 +4,7 @@ import { compoundScenario, qdiiScenario, recoveryReturn } from "@/lib/allocation
 import { LESSONS, readLearningProgress } from "@/lib/curriculum";
 import { money, type Profile, type calculate } from "@/lib/finance";
 import { useLocalRecord } from "./useLocalRecord";
+import { KnowledgeSearch } from "./KnowledgeSearch";
 
 interface Props {
   profile: Profile;
@@ -94,6 +95,7 @@ export function LearningCenter({ profile, balances, privacy, topic, selectTopic,
       <div className="course-progress"><GraduationCap size={28} /><strong>{passed}<small> / {LESSONS.length}</small></strong><span>节随堂题已答对</span></div>
     </section>
     {progress.error && <p className="warning-box" role="status">{progress.error}</p>}
+    <KnowledgeSearch learn={selectTopic} />
     <div className="course-layout">
       <nav className="panel course-navigation" aria-label="学习路径">
         <div className="panel-heading"><h2>从生活到投资</h2><BookOpen size={18} /></div>

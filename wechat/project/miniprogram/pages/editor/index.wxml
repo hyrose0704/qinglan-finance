@@ -1,0 +1,28 @@
+<view class="screen">
+  <view wx:if="{{!ready}}" class="card">正在读取资金档案…</view>
+  <form wx:else bindsubmit="save">
+    <view class="notice">灰字是填写示例。空白金额保存时按 0 记录，下次编辑仍显示为空。</view>
+    <view wx:for="{{groups}}" wx:key="id" wx:for-item="group" class="card">
+      <view class="section-title">{{group.title}}</view>
+      <text wx:if="{{group.help}}" class="detail">{{group.help}}</text>
+      <label wx:for="{{group.fields}}" wx:key="id" class="field block">
+        <text class="field-title">{{item.label}} <text class="small">{{item.unit}}</text></text>
+        <input name="{{item.id}}" type="digit" class="input" value="{{item.value}}" placeholder="{{item.example}}" placeholder-class="placeholder" maxlength="24" disabled="{{saving}}" />
+      </label>
+      <view wx:if="{{group.toggle}}" class="ledger">
+        <view class="row"><view class="label">{{group.toggleLabel}}</view>
+          <switch checked="{{group.checked}}" data-index="{{index}}" bindchange="toggle" color="#285942" disabled="{{saving}}" />
+        </view>
+        <text class="small block">{{group.toggleHelp}}</text>
+      </view>
+    </view>
+    <view class="card">
+      <view class="section-title">规划模板</view>
+      <view class="segmented">
+        <button wx:for="{{risks}}" wx:key="id" class="segment {{risk === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="setRisk">{{item.name}}</button>
+      </view>
+    </view>
+    <view wx:if="{{notice}}" class="notice">{{notice}}</view>
+    <button class="button full" form-type="submit" disabled="{{saving}}" loading="{{saving}}">{{saving ? '正在保存…' : '保存资金档案'}}</button>
+  </form>
+</view>

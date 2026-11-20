@@ -73,6 +73,12 @@ npm run local-assistant
 
 仓库 Settings → Pages → Build and deployment → Source 选择 **GitHub Actions**。此后每次向 `main` 提交都会自动测试、构建和发布，Actions 页面可查看状态。
 
+## 微信小程序
+
+微信版提供晨报与行情、持仓档案、资金规划和投资课程。行情读取和资金计算沿用网站逻辑。已有青览用户可使用原邮箱账号读取并同步持仓。
+
+运行 `npm run build:wechat` 后，将 `dist-wechat` 导入微信开发者工具。`main` 每次更新都会在 GitHub Actions 生成 `qinglan-wechat` 项目包。手机预览、合法域名和发布流程见[微信小程序使用说明](docs/wechat-mini-program.md)。
+
 ## 本地运行
 
 需要 Node.js 24。

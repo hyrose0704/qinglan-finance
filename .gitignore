@@ -1,5 +1,7 @@
 node_modules/
 dist/
+dist-wechat/
+project.private.config.json
 work/
 .env*
 *.log

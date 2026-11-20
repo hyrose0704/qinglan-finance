@@ -1,0 +1,40 @@
+<view class="screen">
+  <view class="card">
+    <view class="section-title">资金档案账号</view>
+    <text class="detail">{{summary}}</text>
+    <text wx:if="{{signedIn}}" class="body-copy">{{email}}</text>
+    <text wx:if="{{revision}}" class="small">当前档案版本 {{revision}}</text>
+    <form wx:if="{{login}}" bindsubmit="submit">
+      <text class="detail">使用你在青览网页注册的同一邮箱和密码。</text>
+      <label class="field block"><text class="field-title">邮箱</text><input class="input" name="email" value="{{email}}" placeholder="输入青览账号邮箱" maxlength="254" disabled="{{busy}}" /></label>
+      <label class="field block"><text class="field-title">密码</text><input class="input" name="password" password placeholder="输入青览账号密码" maxlength="128" disabled="{{busy}}" /></label>
+      <button class="button full" form-type="submit" disabled="{{busy}}" loading="{{busy}}">登录并读取档案</button>
+      <button wx:if="{{!signedIn}}" class="link" data-url="https://hyrose0704.github.io/qinglan-finance/" bindtap="copySource">首次使用？复制青览网页地址去注册 ↗</button>
+    </form>
+    <block wx:if="{{signedIn}}">
+      <button wx:if="{{!login}}" class="button light full" bindtap="refresh" disabled="{{busy}}">读取云端档案</button>
+      <button wx:if="{{canImport}}" class="button light full" bindtap="importLocal" disabled="{{busy}}">同步这台设备的未登录档案</button>
+      <button class="link" bindtap="logout" disabled="{{busy}}">退出此设备的账号</button>
+    </block>
+  </view>
+  <view wx:if="{{notice}}" class="notice">{{notice}}</view>
+  <view wx:if="{{pending}}" class="card">
+    <view class="section-title">{{conflict ? '核对本机与云端版本' : '本机档案待同步'}}</view>
+    <view wx:if="{{canUseCloud && conflict}}" class="detail">云端第 {{remoteVersion}} 版 · {{remoteTime}}（北京）</view>
+    <view wx:for="{{comparison}}" wx:key="title" class="ledger row">
+      <text class="label">{{item.title}}</text><text class="small">本机 {{item.local}}</text><text class="small">云端 {{item.cloud}}</text>
+    </view>
+    <button class="button full" disabled="{{busy || (conflict && remoteVersion === null)}}" bindtap="keepLocal">{{conflict ? '使用本机档案更新云端' : '同步当前档案'}}</button>
+    <button wx:if="{{conflict && canUseCloud}}" class="button light full" disabled="{{busy}}" bindtap="useCloud">采用云端档案</button>
+  </view>
+  <view class="card">
+    <view class="row"><view class="section-title">金额隐私</view><switch checked="{{privacy}}" bindchange="togglePrivacy" color="#285942" /></view>
+    <text class="detail">隐藏晨报、持仓和规划中的个人金额。编辑档案时可核对原输入。</text>
+  </view>
+  <view class="card">
+    <view class="section-title">数据如何保存</view>
+    <text class="body-copy">未登录时，资金档案保存在当前设备。登录后，密码交由 Supabase 验证，设备仅保存会话。资产按账号同步到你自己的档案，计划偏好和答题进度保存在当前小程序。</text>
+    <text class="detail">点击资料的来源按钮会复制公开网址。持仓金额在设备上根据公开行情计算。</text>
+    <button class="link" bindtap="openEditor" disabled="{{busy}}">编辑资金档案 ↗</button>
+  </view>
+</view>

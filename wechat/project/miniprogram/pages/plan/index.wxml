@@ -1,0 +1,59 @@
+<view class="screen">
+  <view class="hero">
+    <text class="hero-overline">现金流、用款期限与风险</text>
+    <view class="hero-title">资金规划</view>
+    <text class="hero-date">先留出生活和目标资金，再比较长期资金的去向。</text>
+  </view>
+  <view wx:if="{{!saved}}" class="card">
+    <view class="section-title">{{busy ? '正在读取资金档案' : '从你的资金档案开始'}}</view>
+    <text class="detail">需要现金、每月收支、应急金月数和近期明确用款。</text>
+    <button class="button full" bindtap="openEditor" disabled="{{busy}}">填写资金档案</button>
+    <button class="link" data-id="reserve" bindtap="openLesson">先学怎么预留资金 ↗</button>
+  </view>
+  <block wx:else>
+    <view class="card">
+      <view class="row"><view class="section-title">你的条件</view><button class="button light" bindtap="openEditor" disabled="{{busy}}">核对档案</button></view>
+      <view class="field" wx:for="{{fields}}" wx:key="id">
+        <text class="field-title">{{item.label}}</text>
+        <picker range="{{item.labels}}" value="{{item.index}}" data-id="{{item.id}}" bindchange="preference">
+          <view class="field-picker">{{item.value}} <text class="muted">▾</text></view>
+        </picker>
+      </view>
+    </view>
+    <view class="card tinted">
+      <view class="section-title">先安排预留</view>
+      <view class="ledger row"><text>应急金、近期用款和额外还款</text><text class="number">{{reserve}}</text></view>
+      <view wx:if="{{needsReserve}}" class="row stat"><text>预留缺口</text><text class="number">{{reserveGap}}</text></view>
+      <view class="row stat"><text>剩余长期资金</text><text class="number">{{longTerm}}</text></view>
+      <text class="detail">从已录入资产中扣除预留后得到长期资金。能随时用的现金取决于实际到账情况。</text>
+    </view>
+
+    <view class="card">
+      <view class="section-title">配置与下月结余</view>
+      <text wx:if="{{blocked}}" class="detail">{{status}}</text>
+      <view wx:if="{{!blocked}}" class="ledger" wx:for="{{target}}" wx:key="id">
+        <view class="row"><text class="label">{{item.title}}</text><text class="number">{{item.total}}</text></view>
+        <text class="small">下月结余候选 {{item.monthly}}</text>
+      </view>
+      <view class="ledger row"><text>下月可规划结余</text><text class="number">{{surplus}}</text></view>
+      <view wx:if="{{needsReserve}}" class="row stat"><text>结余先补预留</text><text class="number">{{monthlyReserve}}</text></view>
+      <text wx:if="{{monthsToReserve}}" class="detail">按当前月结余，约 {{monthsToReserve}} 个月补齐预留。</text>
+      <view wx:if="{{!blocked}}" class="ledger">
+        <text wx:for="{{reasons}}" wx:key="*this" class="detail">{{item}}</text>
+      </view>
+    </view>
+    <view class="card">
+      <view class="section-title">如果同时下跌</view>
+      <view class="field row"><text>股票类下跌</text><text class="number">{{shocks.equity}}%</text></view>
+      <slider min="10" max="60" step="1" value="{{shocks.equity}}" data-key="equity" bindchange="shock" activeColor="#285942" />
+      <view class="field row"><text>黄金下跌</text><text class="number">{{shocks.gold}}%</text></view>
+      <slider min="10" max="40" step="1" value="{{shocks.gold}}" data-key="gold" bindchange="shock" activeColor="#285942" />
+      <view class="ledger row"><text>已估值持仓的情景损失</text><text class="number">{{currentStress}}</text></view>
+      <view wx:if="{{!blocked}}" class="row stat"><text>候选配置的情景损失</text><text class="number">{{targetStress}}</text></view>
+      <view class="row stat"><text>你填写的可承受损失</text><text class="number">{{budget}}</text></view>
+      <text wx:if="{{exceeds}}" class="detail">该情景超过档案中的可承受损失。</text>
+      <text class="small block stat">这些跌幅是用于比较的假设，买卖费用和现金工具风险需另核。</text>
+      <button class="link" data-id="risk" bindtap="openLesson">学习怎样把风险换算成金额 ↗</button>
+    </view>
+  </block>
+</view>

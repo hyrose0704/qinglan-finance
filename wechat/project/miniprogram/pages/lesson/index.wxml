@@ -1,0 +1,32 @@
+<view class="screen">
+  <view wx:if="{{!lesson}}" class="card">这节课暂未找到。</view>
+  <block wx:else>
+    <view class="hero">
+      <text class="hero-overline">{{track}} · {{lesson.minutes}} 分钟{{passed ? ' · 已答对' : ''}}</text>
+      <view class="hero-title lesson-title">{{lesson.title}}</view>
+      <text class="hero-date">{{lesson.goal}}</text>
+    </view>
+    <view wx:for="{{lesson.sections}}" wx:key="title" class="card">
+      <view class="section-title">{{item.title}}</view><text class="body-copy">{{item.text}}</text>
+    </view>
+    <view wx:if="{{lesson.caseStudy}}" class="card tinted">
+      <view class="section-title">{{lesson.caseStudy.title}}</view>
+      <view class="ledger"><view class="label">条件</view><text class="body-copy">{{lesson.caseStudy.evidence}}</text></view>
+      <view class="ledger"><view class="label">计算</view><text class="body-copy">{{lesson.caseStudy.calculation}}</text></view>
+      <view class="ledger"><view class="label">解读</view><text class="body-copy">{{lesson.caseStudy.interpretation}}</text></view>
+      <view class="ledger"><view class="label">怎样复核</view><text class="body-copy">{{lesson.caseStudy.falsifier}}</text></view>
+    </view>
+    <view class="card">
+      <view class="section-title">随堂题</view><text class="body-copy">{{lesson.question}}</text>
+      <button wx:for="{{lesson.options}}" wx:key="*this" class="button {{selected === index ? '' : 'light'}} full" data-answer="{{index}}" bindtap="answer">{{item}}</button>
+      <text wx:if="{{feedback}}" class="detail">{{feedback}}</text>
+    </view>
+    <view class="card">
+      <view class="section-title">动手核对</view><text class="body-copy">{{lesson.task}}</text>
+      <button wx:for="{{sources}}" wx:key="url" class="source" data-url="{{item.url}}" bindtap="copySource">{{item.title}} ↗</button>
+      <button class="button light full" bindtap="openLab">打开计算实验</button>
+      <button wx:if="{{next}}" class="button full" bindtap="next">继续下一课</button>
+      <button wx:else class="button full" bindtap="goPlan">用到我的资金规划</button>
+    </view>
+  </block>
+</view>

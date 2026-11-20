@@ -14,12 +14,12 @@ const navPage = { title: "万家基金 · 019442 产品与公告", url: "https:/
 const realYieldPage = { title: "FRED · 美国十年期实际收益率", url: "https://fred.stlouisfed.org/series/DFII10" };
 const sgeSessionPage = { title: "上金所 · Au99.99 常规交易时间", url: "https://www.sge.com.cn/h5_cpfw/Au9999H5" };
 const nasdaqCalendar = { title: "纳斯达克 · 美股交易日历", url: "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule" };
-const nyClock = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
-});
-const beijingClock = new Intl.DateTimeFormat("zh-CN", {
-  timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-});
+let nyClock: Intl.DateTimeFormat | undefined;
+
+function beijingPublication(stamp: string) {
+  const local = new Date(Date.parse(stamp) + 8 * 3600000).toISOString();
+  return local.slice(5, 10).replace("-", "/") + " " + local.slice(11, 16);
+}
 
 function readableChange(move?: BriefMovement) {
   return move?.value != null && move.change != null && Number.isFinite(move.change) ? move.change : null;
@@ -35,7 +35,7 @@ function quoteSource(move: BriefMovement) {
 
 function headlineSource(item: BriefNews, label: string) {
   const publisher = BRIEF_SOURCES.find(source => source.id === item.sourceId)?.name;
-  return { title: `${label} · 北京时间 ${beijingClock.format(new Date(item.publishedAt))} · ${publisher} · ${item.title}`, url: item.url };
+  return { title: `${label} · 北京时间 ${beijingPublication(item.publishedAt)} · ${publisher} · ${item.title}`, url: item.url };
 }
 
 function subject(item: BriefNews) {
@@ -56,6 +56,9 @@ function subject(item: BriefNews) {
 }
 
 function usPublicationWindow(item: BriefNews, day: string): "before" | "candidate" | "check-close" | "after" {
+  nyClock ??= new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
+  });
   const parts = Object.fromEntries(nyClock.formatToParts(new Date(item.publishedAt)).map(part => [part.type, part.value]));
   const localDay = `${parts.year}-${parts.month}-${parts.day}`;
   // After the previous regular close or before 13:00 on the review day is unambiguous
@@ -105,7 +108,7 @@ function goldAnalysis(edition: MorningEdition, movements: BriefMovement[], news:
   const sources = facts.map(quoteSource);
   if (article) {
     sources.push(headlineSource(article, "常规日盘截止前线索"));
-    possibleReason += `${subject(article)}在复盘日北京时间${beijingClock.format(new Date(article.publishedAt)).slice(-5)}发布，早于常规日盘截止。可比对发布前后的实际利率和金价。`;
+    possibleReason += `${subject(article)}在复盘日北京时间${beijingPublication(article.publishedAt).slice(-5)}发布，早于常规日盘截止。可比对发布前后的实际利率和金价。`;
   }
   if (later) sources.push(headlineSource(later, "后续跟踪"));
   if (article || later) sources.push(sgeSessionPage);

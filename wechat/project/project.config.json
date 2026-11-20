@@ -1,0 +1,14 @@
+{
+  "description": "青览微信小程序",
+  "projectname": "qinglan-finance-wechat",
+  "appid": "touristappid",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "miniprogram/",
+  "libVersion": "3.8.0",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "postcss": true,
+    "minified": true
+  }
+}

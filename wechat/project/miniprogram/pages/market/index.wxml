@@ -1,0 +1,105 @@
+<view class="screen">
+  <view class="hero">
+    <view class="row align-top">
+      <view><text class="hero-overline">每日上午 09:00 · 北京时间</text><view class="hero-title">市场晨报</view></view>
+      <button class="button hero-button" bindtap="openAccount">个人中心</button>
+    </view>
+    <view wx:if="{{issue}}" class="hero-date">复盘 {{issue.reviewDate}}<text class="hero-divider"> / </text>{{issue.date}} 刊</view>
+    <text wx:else class="hero-date">{{loading ? '晨报读取中…' : '等待可用晨报'}}</text>
+  </view>
+
+  <view class="toolbar row">
+    <picker wx:if="{{dates.length}}" range="{{dates}}" value="{{dateIndex}}" bindchange="selectIssue">
+      <view class="picker-inline">{{dates[dateIndex]}} <text class="muted">▾</text></view>
+    </picker>
+    <button class="button light" bindtap="refresh" disabled="{{loading}}">{{loading ? '读取中…' : '刷新晨报'}}</button>
+  </view>
+  <view wx:if="{{warning}}" class="notice">{{warning}}</view>
+  <view wx:if="{{archiveNote}}" class="notice">{{archiveNote}}</view>
+  <view wx:elif="{{packed && issue}}" class="notice">正在显示随版本保存的晨报。</view>
+
+  <block wx:if="{{issue}}">
+    <view class="card">
+      <view class="section-title">主要涨跌</view>
+      <view class="ledger" wx:for="{{issue.primary}}" wx:key="id">
+        <view class="row align-top">
+          <view class="grow"><view class="label">{{item.name}}</view><text class="small">{{item.compare}}</text></view>
+          <view class="right">
+            <view class="number">{{item.value}} <text class="small">{{item.unit}}</text></view>
+            <text wx:if="{{item.change}}" class="change {{item.tone}}">{{item.delta ? item.delta + ' · ' : ''}}{{item.change}}</text>
+          </view>
+        </view>
+        <text wx:if="{{item.latest}}" class="detail">{{item.latest}}</text>
+        <text wx:if="{{item.comparisonNote}}" class="small block">{{item.comparisonNote}}</text>
+        <text wx:if="{{item.supplemented}}" class="small block">{{item.supplemented}}（北京）</text>
+        <button wx:if="{{item.url}}" class="source" data-url="{{item.url}}" bindtap="copySource">{{item.source}} ↗</button>
+      </view>
+    </view>
+
+    <view class="card tinted">
+      <view class="row"><view class="section-title">对我的持仓</view><button class="button light" bindtap="openEditor">{{saved ? '核对持仓' : '填写持仓'}}</button></view>
+      <view wx:if="{{privacy}}" class="detail">金额隐私已开启。</view>
+      <view wx:elif="{{loadingProfile}}" class="detail">正在读取资金档案…</view>
+      <block wx:elif="{{issue.impact}}">
+        <text class="detail">用当前填写的克数和份额回算，假设期间数量保持一致。</text>
+        <view wx:for="{{issue.impact.rows}}" wx:key="id" class="ledger">
+          <view class="row"><view class="label">{{item.name}}</view><text class="number {{item.tone}}">{{item.amount}}</text></view>
+          <text wx:if="{{item.quantity}}" class="small block">{{item.quantity}}{{item.perUnit ? ' × ' + item.perUnit : ''}}{{item.previousDate ? ' · 对比 ' + item.previousDate : ''}}</text>
+          <text class="small block">{{item.note}}</text>
+        </view>
+        <view wx:if="{{issue.impact.amount}}" class="sum row">
+          <text>{{issue.impact.subtotal ? '已核算持仓小计' : '黄金与基金合计'}}</text><text class="number">{{issue.impact.amount}}</text>
+        </view>
+      </block>
+      <button wx:if="{{!saved}}" class="link" bindtap="openAccount">登录青览账号，读取已有档案 ↗</button>
+    </view>
+
+    <view class="section-title outside">原因与接下来的关注点</view>
+    <view wx:for="{{issue.analysis}}" wx:key="asset" class="card">
+      <view class="section-title">{{item.title}}</view>
+      <text class="body-copy">{{item.possibleReason}}</text>
+      <view wx:if="{{item.watch}}" class="watch">
+        <view class="label">接下来关注</view><text class="detail">{{item.watch}}</text>
+      </view>
+      <button class="link" data-id="{{item.asset}}" bindtap="toggleEvidence">{{openEvidence === item.asset ? '收起证据' : '核对证据与其他解释'}} ↗</button>
+      <view wx:if="{{openEvidence === item.asset}}" class="evidence">
+        <text wx:if="{{item.observation}}" class="detail">{{item.observation}}</text>
+        <text wx:if="{{item.counterEvidence}}" class="detail">{{item.counterEvidence}}</text>
+        <button wx:for="{{item.sources}}" wx:for-item="ref" wx:key="url" class="source" data-url="{{ref.url}}" bindtap="copySource">{{ref.title}} ↗</button>
+      </view>
+      <button wx:if="{{item.asset === 'gold' || item.asset === 'nasdaq'}}" class="source" data-id="{{item.asset === 'gold' ? 'gold' : 'qdii'}}" bindtap="openLesson">{{item.asset === 'gold' ? '学习黄金在组合中的作用' : '学习基金净值和纳指的差异'}} ↗</button>
+    </view>
+
+    <view class="card">
+      <button class="full-link" bindtap="toggleSources">{{showSources ? '收起' : '查看'}} 本期新闻和国际市场对照 <text>{{showSources ? '−' : '+'}}</text></button>
+      <block wx:if="{{showSources}}">
+        <view wx:for="{{issue.context}}" wx:key="id" class="ledger">
+          <view class="row"><text>{{item.name}}</text><text class="number {{item.tone}}">{{item.value}} {{item.unit}}</text></view>
+          <text class="detail">{{item.change}} · {{item.compare}}</text>
+          <button wx:if="{{item.url}}" class="source" data-url="{{item.url}}" bindtap="copySource">{{item.source}} ↗</button>
+        </view>
+        <view wx:for="{{issue.news}}" wx:key="url" class="ledger">
+          <text class="small">{{item.stamp}} 北京 · {{item.issuer}}</text>
+          <button class="source" data-url="{{item.url}}" bindtap="copySource">{{item.title}} ↗</button>
+          <text class="detail">{{item.note}}</text>
+        </view>
+        <text wx:if="{{!issue.news.length}}" class="detail">本期尚未取得可核对的相关新闻。</text>
+        <text wx:for="{{issue.gaps}}" wx:key="*this" class="small block">{{item}}</text>
+      </block>
+    </view>
+    <view class="small footnote">新闻截至 {{issue.cutoff}}（北京）。初刊 {{issue.generatedAt}}{{issue.updatedAt ? ' · 更新 ' + issue.updatedAt : ''}}。</view>
+  </block>
+
+  <view class="card">
+    <button class="full-link" bindtap="toggleQuotes">{{showQuotes ? '收起' : '查看'}} 最新行情快照 <text>{{showQuotes ? '−' : '+'}}</text></button>
+    <block wx:if="{{showQuotes}}">
+      <text wx:if="{{quoteTime}}" class="detail">最近采集 {{quoteTime}}（北京）。各市场报价时点见下方。</text>
+      <view wx:for="{{quotes}}" wx:key="id" class="ledger">
+        <view class="row"><view class="label">{{item.label}}</view><view class="number">{{item.value}} <text class="small">{{item.unit}}</text></view></view>
+        <text class="change {{item.tone}}">{{item.change}}</text><text class="small"> {{item.date}}</text>
+        <button class="source" data-url="{{item.url}}" bindtap="copySource">{{item.source}} ↗</button>
+      </view>
+      <text wx:if="{{!quotes.length}}" class="detail">暂无可用的报价快照。</text>
+    </block>
+  </view>
+</view>

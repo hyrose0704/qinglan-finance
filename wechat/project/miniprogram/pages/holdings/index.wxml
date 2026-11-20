@@ -1,0 +1,28 @@
+<view class="screen">
+  <view class="hero">
+    <view class="row align-top">
+      <view class="grow"><text class="hero-overline">{{saved && partial ? '已估值资产小计' : '已录入资产参考市值'}}</text><view class="big-number">{{total}}</view></view>
+      <button class="button hero-button" bindtap="openAccount">个人中心</button>
+    </view>
+    <text class="hero-date">{{account}}</text>
+  </view>
+  <view wx:if="{{notice}}" class="notice">{{notice}}</view>
+  <view wx:if="{{!saved}}" class="card">
+    <view class="section-title">{{busy ? '正在读取档案' : '添加你的持仓'}}</view>
+    <text class="detail">填入黄金克数、纳指基金份额和现金。有网页档案可用同一个账号读取。</text>
+    <button class="button full" bindtap="openEditor" disabled="{{busy}}">填写资金档案</button>
+    <button class="link" bindtap="openAccount">登录已有的青览账号 ↗</button>
+  </view>
+  <block wx:else>
+    <view class="toolbar row"><text class="small">{{partial ? '部分持仓或价格待补齐' : '按档案选择的价格口径估值'}}</text><button class="button light" bindtap="openEditor" disabled="{{busy}}">编辑档案</button></view>
+    <view class="card row"><view class="section-title">现金与存款</view><text class="number">{{cash}}</text></view>
+    <view wx:for="{{rows}}" wx:key="id" class="card">
+      <view class="row"><view class="section-title">{{item.title}}</view><text class="number">{{item.value}}</text></view>
+      <view class="ledger row"><text>持仓数量</text><text>{{item.quantity}}</text></view>
+      <view class="row stat"><text>{{item.basis}}</text><text>{{item.price}}</text></view>
+      <view class="row stat"><text>持仓成本</text><text>{{item.cost}}</text></view>
+      <view class="row stat"><text>浮动盈亏</text><text>{{item.pnl}}</text></view>
+    </view>
+    <text class="small footnote block">实际卖出所得、手续费和已实现收益请核对平台流水。</text>
+  </block>
+</view>

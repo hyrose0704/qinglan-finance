@@ -1,0 +1,33 @@
+<view class="screen">
+  <view class="hero">
+    <text class="hero-overline">{{completed}} / {{total}} 节随堂题已答对</text>
+    <view class="hero-title">投资知识</view>
+    <text class="hero-date">从现金流和资产配置，到读财报、估值与检验假设。</text>
+  </view>
+  <view class="card">
+    <view class="section-title">查一个问题</view>
+    <input class="input field" value="{{query}}" bindinput="search" placeholder="例如：汇率、现金流、市盈率" placeholder-class="placeholder" maxlength="160" />
+    <block wx:if="{{searching}}">
+      <view wx:for="{{results}}" wx:key="lessonId" class="ledger">
+        <button class="full-link" data-id="{{item.lessonId}}" bindtap="openLesson">{{item.lessonTitle}} <text>›</text></button>
+        <text class="detail">{{item.text}}</text>
+      </view>
+      <text wx:if="{{!results.length}}" class="detail">没找到相近的课程。试试缩短为一个术语。</text>
+    </block>
+  </view>
+  <view class="card">
+    <view class="section-title">课程</view>
+    <view class="segmented">
+      <button wx:for="{{tracks}}" wx:key="id" class="segment {{item.id === track ? 'active' : ''}}" data-id="{{item.id}}" bindtap="setTrack">{{item.title}}</button>
+    </view>
+    <view wx:for="{{rows}}" wx:key="id" class="ledger">
+      <button class="full-link" data-id="{{item.id}}" bindtap="openLesson">{{item.title}} <text>›</text></button>
+      <text class="small">{{item.minutes}} 分钟{{item.done ? ' · 已答对' : ''}}</text>
+    </view>
+  </view>
+  <view class="card tinted">
+    <view class="section-title">计算实验</view>
+    <text class="detail">调整收益、费率、汇率、跌幅或估值倍数，看结果怎样变化。</text>
+    <button class="button full" bindtap="openLab">打开计算实验</button>
+  </view>
+</view>

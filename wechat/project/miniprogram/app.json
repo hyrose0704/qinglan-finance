@@ -1,0 +1,37 @@
+{
+  "pages": [
+    "pages/market/index",
+    "pages/holdings/index",
+    "pages/plan/index",
+    "pages/learn/index",
+    "pages/editor/index",
+    "pages/account/index",
+    "pages/lesson/index",
+    "pages/lab/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "青览",
+    "navigationBarBackgroundColor": "#254438",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f2f4ee",
+    "backgroundTextStyle": "dark",
+    "enablePullDownRefresh": true
+  },
+  "networkTimeout": {
+    "request": 12000
+  },
+  "tabBar": {
+    "color": "#61736b",
+    "selectedColor": "#1d5f46",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/market/index", "text": "晨报" },
+      { "pagePath": "pages/holdings/index", "text": "持仓" },
+      { "pagePath": "pages/plan/index", "text": "规划" },
+      { "pagePath": "pages/learn/index", "text": "学习" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

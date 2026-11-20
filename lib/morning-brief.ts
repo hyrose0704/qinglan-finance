@@ -43,8 +43,8 @@ function plain(value: string): string {
 }
 function tag(raw: string, name: string): string { return plain(raw.match(new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)<\\/${name}>`, "i"))?.[1] || ""); }
 function trustedUrl(value: string, host: string): boolean {
-  try { const url = new URL(value); return url.protocol === "https:" && url.hostname === host && !url.username && !url.password && !url.port; }
-  catch { return false; }
+  const authority = /^https:\/\/([a-z0-9.-]+)(?=[/?#]|$)/i.exec(value)?.[1];
+  return authority?.toLowerCase() === host && !/[\x00-\x20\x7f\\]/.test(value);
 }
 function identifyNews(text: string): { topics: BriefTopic[]; note: string } {
   const topics: BriefTopic[] = [];

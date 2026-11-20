@@ -1,0 +1,20 @@
+<view class="screen">
+  <view class="card">
+    <view class="section-title">选择实验</view>
+    <view class="segmented">
+      <button wx:for="{{modes}}" wx:key="id" class="segment {{item.id === mode ? 'active' : ''}}" data-id="{{item.id}}" bindtap="changeMode">{{item.title}}</button>
+    </view>
+    <view wx:for="{{fields}}" wx:key="id" class="ledger">
+      <view class="row"><text>{{item.label}}</text><text class="number">{{item.value}} {{item.unit}}</text></view>
+      <slider min="{{item.min}}" max="{{item.max}}" step="{{item.step}}" value="{{item.value}}" data-id="{{item.id}}" bindchange="change" activeColor="#285942" />
+    </view>
+  </view>
+  <view wx:if="{{result}}" class="card tinted">
+    <view class="section-title">{{result.headline}}</view>
+    <view class="big-number">{{result.result}}</view>
+    <view wx:for="{{result.scenarios}}" wx:key="label" class="ledger row">
+      <view><view class="label">{{item.label}}</view><text class="small">{{item.inputs}}</text></view><text class="number">{{item.value}}</text>
+    </view>
+    <text class="detail">{{result.note}}</text>
+  </view>
+</view>

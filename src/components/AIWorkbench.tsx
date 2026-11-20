@@ -222,7 +222,7 @@ export function AIWorkbench({ active, profile, balances, privacy, showAmounts, a
       <section className="panel ai-context" aria-labelledby="context-heading">
         <div className="panel-heading"><h2 id="context-heading"><CircleHelp size={19} />助手使用哪些上下文</h2>
           <span className="badge">{profile.mode === "demo" ? "当前为演示档案" : "读取当前资金档案"}</span></div>
-        <p>资金与持仓读取已提交到网页的档案，规划条件读取最近保存值。资产弹窗中尚未提交的修改不包含在内。最近6轮对话会随每次问题提供。</p>
+        <p>资金与持仓读取已提交的档案，规划条件读取最近保存值。发送问题时，会附上最近6轮对话，并按当前问题匹配最多两段公开课程和阅读来源。只想讨论课程时，可以关闭下方的资金摘要。</p>
         <label className="ai-check"><input type="checkbox" checked={inputs.includeSiteData} disabled={!!pending}
           onChange={event => updateInputs({ includeSiteData: event.target.checked })} />发送网站资金与规划摘要给 {providerLabel}</label>
         <p className="ai-help">摘要包括现金、收入支出、还款与用款预留、持仓成本、损失承受金额、规划条件和网页计算结果。取消勾选后不附带此摘要。</p>
@@ -243,7 +243,7 @@ export function AIWorkbench({ active, profile, balances, privacy, showAmounts, a
         <p className="ai-help">当前为 {providerLabel} 文字问答，尚未启用联网搜索。模型回答需要核对，市场数据请以“市场观察”的来源和时间为准。</p>
         {!inputs.messages.length && !pending && <div className="ai-empty"><MessageSquare size={27} /><h3>从你最想弄清楚的问题开始</h3>
           <p>可以解释计算，也可以先让助手找出资料中需要补齐的条件。</p>
-          <div className="ai-suggestions">{["根据我的现金流和目标，先列出需要核对的问题。", "帮我解释应急金和可新增投资现金的计算。", "我的持仓有哪些集中风险？"].map(question =>
+          <div className="ai-suggestions">{["根据我的现金流和目标，先列出需要核对的问题。", "用苹果2024财年案例解释毛利率变化，并列出复核步骤。", "两只基金都持有同一家公司，怎样计算集中度？"].map(question =>
             <button key={question} onClick={() => updateInputs({ draft: question })}>{question}</button>)}</div></div>}
         <div className="ai-messages" role="log" aria-label="助手对话记录" aria-live="polite">
           {inputs.messages.map((turn, index) => <article key={index} className={`ai-turn ${turn.role}`}><strong>{turn.role === "user" ? "你" : turn.provider || "DeepSeek"}</strong><p>{turn.content}</p></article>)}

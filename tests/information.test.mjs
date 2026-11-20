@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { searchKnowledge } from "../lib/knowledge-search.ts";
+import { LESSONS, lessonFromHash, readLearningProgress } from "../lib/curriculum.ts";
 import { parsePolicyFeed, readPolicySnapshot } from "../lib/policy.ts";
 
 const now = Date.parse("2026-11-19T12:00:00Z");
@@ -23,6 +24,31 @@ test("unrelated questions do not produce fabricated course explanations", () => 
 
 test("empty questions have no search results", () => {
   assert.deepEqual(searchKnowledge(" "), []);
+});
+
+test("research searches return the matching case and a primary reading link", () => {
+  for (const [query, expected] of [["苹果毛利率", "gross-margin"], ["PE", "peer-multiples"],
+    ["DCF 终值", "dcf-equity-bridge"], ["指数集中度", "index-lookthrough"], ["141.5%", "revenue-drivers"],
+    ["实际购买力", "real-return"], ["债券久期", "bond-risk"]]) {
+    const result = searchKnowledge(query)[0];
+    assert.equal(result.lessonId, expected, query);
+    assert.ok(result.source.url.startsWith("https://"));
+  }
+  assert.match(searchKnowledge("141.5%")[0].text, /141\.5%/);
+});
+
+test("new tracks preserve existing quiz progress and every public lesson link resolves", () => {
+  assert.deepEqual(readLearningProgress({ cash: 1, reserve: 2, gold: 99, missing: 0 }), { cash: 1, reserve: 2 });
+  assert.equal(lessonFromHash("#access_token=example"), undefined);
+  assert.equal(lessonFromHash("#learn/unknown"), undefined);
+  assert.equal(new Set(LESSONS.map(lesson => lesson.id)).size, LESSONS.length);
+  assert.deepEqual(new Set(LESSONS.map(lesson => lesson.track)), new Set(["basics", "company", "valuation", "portfolio"]));
+  for (const lesson of LESSONS) {
+    assert.equal(lessonFromHash("#learn/" + lesson.id), lesson);
+    assert.equal(readLearningProgress({ [lesson.id]: lesson.answer })[lesson.id], lesson.answer);
+    assert.ok(lesson.options[lesson.answer]);
+    if (lesson.track !== "basics") assert.ok(Object.values(lesson.caseStudy).every(value => value.trim().length));
+  }
 });
 
 test("official RSS parsing preserves the original release time", () => {

@@ -1,4 +1,13 @@
-export interface Lesson {
+import { COMPANY_LESSONS } from "./company-lessons.ts";
+import { PURCHASING_POWER_LESSONS } from "./purchasing-power-lessons.ts";
+import { VALUATION_RISK_LESSONS } from "./valuation-risk-lessons.ts";
+
+export const TRACKS = {
+  basics: "资金基础", company: "公司与财报", valuation: "估值与预期", portfolio: "组合风险",
+} as const;
+export type Track = keyof typeof TRACKS;
+
+export interface LessonContent {
   id: string;
   title: string;
   minutes: number;
@@ -10,9 +19,18 @@ export interface Lesson {
   explanation: string;
   task: string;
   source: { title: string; url: string };
+  furtherReading?: { title: string; url: string }[];
 }
 
-export const LESSONS: Lesson[] = [
+export interface ResearchLesson extends LessonContent {
+  track: Exclude<Track, "basics">;
+  caseStudy: {
+    title: string; evidence: string; calculation: string; interpretation: string; falsifier: string;
+  };
+}
+export type Lesson = (LessonContent & { track: "basics" }) | ResearchLesson;
+
+const BASICS: LessonContent[] = [
   {
     id: "cash", title: "先看现金流，再谈收益", minutes: 5,
     goal: "分清资产、成本、月结余和真正能动用的钱。",
@@ -126,6 +144,17 @@ export const LESSONS: Lesson[] = [
     source: { title: "Investor.gov · 配置与再平衡", url: "https://www.investor.gov/additional-resources/general-resources/publications-research/info-sheets/beginners-guide-asset" },
   },
 ];
+
+export const LESSONS: Lesson[] = [
+  ...[...BASICS, ...PURCHASING_POWER_LESSONS].map(lesson => ({ ...lesson, track: "basics" as const })),
+  ...COMPANY_LESSONS,
+  ...VALUATION_RISK_LESSONS,
+];
+
+export function lessonFromHash(hash: string): Lesson | undefined {
+  if (!hash.startsWith("#learn/")) return undefined;
+  return LESSONS.find(lesson => lesson.id === hash.slice(7));
+}
 
 export function readLearningProgress(value: unknown): Record<string, number> {
   if (!value || typeof value !== "object") return {};

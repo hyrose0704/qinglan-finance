@@ -1,0 +1,23 @@
+.holdings-scenario .panel-heading { align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+.holding-scenario-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+.holding-scenario-tabs button { border: 1px solid #ccd9d2; border-radius: 7px; padding: 6px 11px; background: #fff; color: #38574a; font: inherit; font-size: 13px; cursor: pointer; }
+.holding-scenario-tabs button[aria-pressed="true"] { background: #2d5845; border-color: #2d5845; color: #fff; }
+.holding-scenario-inputs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 12px; }
+.holding-scenario-inputs div { border-radius: 8px; background: #f3f6f3; padding: 9px 12px; }
+.holding-scenario-inputs dt { color: #52655a; font-size: 12px; }
+.holding-scenario-inputs dd { margin: 3px 0 0; color: #234536; font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.holding-scenario-analysis, .holding-scenario-notice { color: #3e5549; line-height: 1.7; font-size: 13px; margin: 10px 0; }
+.holding-scenario-notice { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.holding-scenario-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.holding-scenario-table th, .holding-scenario-table td { padding: 7px 6px; overflow-wrap: anywhere; text-align: right; border-bottom: 1px solid #e0e7e2; }
+.holding-scenario-table th:first-child { text-align: left; }
+.holding-scenario-table thead th { color: #53645a; font-weight: 500; }
+.holding-scenario-table tbody th { font-weight: 500; }
+.holding-scenario-table tfoot { background: #f3f6f3; font-weight: 650; }
+.holding-scenario-foot { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; }
+.holding-scenario-foot p { flex: 1 1 340px; margin: 0; font-size: 12px; line-height: 1.65; color: #53645a; }
+@media (max-width: 480px) {
+  .holding-scenario-inputs div { padding: 7px; }
+  .holding-scenario-inputs dt { line-height: 1.4; }
+  .holding-scenario-inputs dd { font-size: 16px; }
+}

@@ -1,0 +1,47 @@
+.equity-scenario {
+  min-width: 0;
+  scroll-margin-block-start: 1rem;
+}
+
+.equity-premise, .equity-equation, .equity-note, .equity-reasoning p, .equity-breakpoint p {
+  color: #4b6155;
+  line-height: 1.75;
+  font-size: 14px;
+}
+
+.equity-premise { margin: 0 0 16px; }
+.equity-controls, .equity-reasoning {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 26px;
+}
+.equity-controls .range-field { margin: 0; }
+.equity-controls input { width: 100%; }
+.equity-controls .range-field > span, .equity-controls .range-field b, .equity-case-table tbody th { color: #385844; }
+
+.equity-breakpoint {
+  margin: 18px 0 20px;
+  padding: 14px 16px;
+  background: #edf5ef;
+  border-left: 3px solid #43785d;
+  border-radius: 0 9px 9px 0;
+}
+.equity-breakpoint h3, .equity-reasoning h3 { margin: 0; font-size: 15px; color: #294c39; }
+.equity-breakpoint strong { display: inline-block; margin-left: .4em; font-size: 22px; font-variant-numeric: tabular-nums; }
+.equity-breakpoint p, .equity-reasoning p { margin: 4px 0 0; }
+
+.equity-case-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.equity-case-table caption { text-align: left; padding-bottom: 9px; font-weight: 650; color: #294c39; }
+.equity-case-table th, .equity-case-table td { padding: 8px 10px; border-bottom: 1px solid #dce6de; text-align: right; line-height: 1.4; }
+.equity-case-table th:first-child { text-align: left; }
+.equity-case-table thead th { font-size: 12px; color: #53675c; font-weight: 500; }
+.equity-case-table small { display: block; margin-top: 3px; color: #53675c; font-size: 12px; }
+.equity-case-table .equity-base { background: #f1f6f2; }
+.equity-equation, .equity-note { font-size: 12px; margin: 9px 0 0; }
+.equity-reasoning { margin-top: 18px; }
+.equity-note { margin-top: 16px; }
+
+@media (max-width: 680px) {
+  .equity-controls, .equity-reasoning { grid-template-columns: minmax(0, 1fr); }
+  .equity-case-table th, .equity-case-table td { padding: 8px 5px; }
+}

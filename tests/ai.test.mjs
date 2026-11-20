@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DEMO, calculate } from "../lib/finance.ts";
 import { EMPTY_PREFERENCES } from "../lib/allocation.ts";
+import { searchKnowledge } from "../lib/knowledge-search.ts";
 import { decryptApiKey, encryptApiKey, readEncryptedApiKey } from "../lib/ai-vault.ts";
 import { AIServiceError, askDeepseek, buildSiteContext, createChatMessages, listDeepseekModels,
   readAIInputs, serializeAIInputs } from "../lib/ai.ts";
@@ -83,6 +84,37 @@ test("the current website context is supplied on each explicit request when enab
   assert.match(JSON.stringify(createChatMessages({ ...options, siteContext: "income=17000" })), /income=17000/);
   assert.match(JSON.stringify(createChatMessages({ ...options, siteContext: "income=19000" })), /income=19000/);
   assert.throws(() => createChatMessages({ ...options, question: " ", siteContext: "" }));
+});
+
+test("an explicit research question includes up to two public course excerpts with their original reading links", () => {
+  const question = "苹果2024财年毛利率和现金流怎样分析？";
+  const matches = searchKnowledge(question).slice(0, 2);
+  assert.equal(matches.length, 2);
+  const messages = createChatMessages({ question, notes: "", history: [], siteContext: "PRIVATE_PROFILE", includeSiteData: false });
+  assert.equal(messages.length, 3);
+  assert.equal(messages[1].role, "user");
+  const content = messages[1].content;
+  assert.ok(content.includes("本站公开课程摘录"));
+  assert.equal((content.match(/延伸阅读：/g) || []).length, 2);
+  for (const match of matches) {
+    assert.ok(content.includes(match.lessonTitle));
+    assert.ok(content.includes(match.text.slice(0, 420)));
+    assert.ok(content.includes(match.source.url));
+  }
+  assert.ok(content.length < 2600);
+  assert.ok(!content.includes("PRIVATE_PROFILE"));
+  assert.equal(messages.at(-1).content, question);
+});
+
+test("background, finances and prior conversation cannot retrieve lessons for an unmatched new question", () => {
+  const options = { question: "zyxwvu", notes: "苹果毛利率", history: [{ role: "assistant", content: "DCF 终值" }],
+    siteContext: "指数集中度", includeSiteData: true };
+  const messages = createChatMessages(options);
+  assert.doesNotMatch(messages[1].content, /本站公开课程摘录|https:\/\//);
+  assert.ok(messages[1].content.includes(options.notes));
+  assert.ok(messages[1].content.includes(options.siteContext));
+  assert.equal(messages.at(-2).content, options.history[0].content);
+  assert.equal(createChatMessages({ ...options, includeSiteData: false, notes: "", history: [] }).length, 2);
 });
 
 test("model discovery sends the credential only to the fixed official endpoint without redirects or cookies", async () => {

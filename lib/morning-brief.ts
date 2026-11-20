@@ -1,5 +1,6 @@
-import { beijingDay, shiftDay, type DomesticGold } from "./domestic-gold.ts";
+import { beijingDay, shiftDay, type DomesticGold, type DomesticGoldDay } from "./domestic-gold.ts";
 import type { Point } from "./market.ts";
+import { fundMovement, goldComparison, isCalendarDay, FUND_DISCLOSURE_URL, EASTMONEY_FUND_URL, MISSING_NAV_COMPARISON, type NavObservation, type NavProvider } from "./brief-prices.ts";
 
 export const BRIEF_SOURCES = [
   { id: "cnbc", name: "CNBC · 财经新闻", host: "www.cnbc.com", feed: "https://www.cnbc.com/id/100003114/device/rss/rss.html" },
@@ -15,10 +16,11 @@ export interface BriefSource { id: string; status: "fetched" | "unavailable"; ch
 export interface BriefMovement {
   id: string; name: string; unit: string; value: number | null; change: number | null; date: string | null;
   source: string; url: string; low?: number; high?: number; collectedAt?: string;
+  previousValue?: number; previousDate?: string; latestAvailable?: Point; comparisonNote?: string; supplementedAt?: string;
 }
 export interface BriefAnalysis { title: string; text: string; references: string[] }
 export interface MorningEdition {
-  date: string; reviewDate: string; cutoff: string; generatedAt: string; status: "ready" | "partial";
+  date: string; reviewDate: string; cutoff: string; generatedAt: string; updatedAt?: string; status: "ready" | "partial";
   overview: string; movements: BriefMovement[]; news: BriefNews[]; analysis: BriefAnalysis[]; gaps: string[]; sources: BriefSource[];
 }
 export interface BriefArchive { version: 1; editions: MorningEdition[] }
@@ -95,33 +97,60 @@ function selectNews(news: BriefNews[]): BriefNews[] {
   return selected.slice(0, 6);
 }
 function dailyMove(id: string, name: string, unit: string, rows: Point[], day: string, url: string): BriefMovement {
-  const valid = rows.filter(row => row.date <= day && Number.isFinite(row.value) && row.value > 0).sort((a, b) => a.date.localeCompare(b.date));
+  const valid = rows.filter(row => isCalendarDay(row.date) && row.date <= day && Number.isFinite(row.value) && row.value > 0).sort((a, b) => a.date.localeCompare(b.date));
   const last = valid.find(row => row.date === day), previous = valid.filter(row => row.date < day).at(-1);
-  return { id, name, unit, value: last?.value || null, date: last?.date || null, source: "东方财富 · 日线", url,
-    change: last && previous && Date.parse(day) - Date.parse(previous.date) <= 10 * 86400000 ? (last.value / previous.value - 1) * 100 : null };
+  const pair = last && previous && Date.parse(day) - Date.parse(previous.date) <= 10 * 86400000
+    ? { previousValue: previous.value, previousDate: previous.date, change: (last.value / previous.value - 1) * 100 } : { change: null };
+  return { id, name, unit, value: last?.value || null, date: last?.date || null, source: "东方财富 · 日线", url, ...pair };
 }
-export function buildMorningEdition(input: { now: number; domestic: DomesticGold | null; spot: Point[]; goldFallback?: Point[]; nasdaq: Point[]; dxy: Point[]; news: BriefNews[]; sources: BriefSource[]; previous?: MorningEdition }): MorningEdition {
-  const window = morningWindow(input.now), domestic = input.domestic?.daily.find(row => row.date === window.reviewDate);
+export function buildMorningEdition(input: { now: number; observedAt?: number; domestic: DomesticGold | null; domesticHistory?: DomesticGoldDay[]; fundHistory?: NavObservation[]; fundProvider?: NavProvider;
+  spot: Point[]; goldFallback?: Point[]; nasdaq: Point[]; dxy: Point[]; news: BriefNews[]; sources: BriefSource[]; previous?: MorningEdition }): MorningEdition {
+  const window = morningWindow(input.now);
+  const observedAt = new Date(input.observedAt ?? input.now).toISOString();
+  const sameIssue = input.previous?.date === window.date ? input.previous : undefined;
+  const domestic = input.domesticHistory?.find(row => row.date === window.reviewDate) ?? input.domestic?.daily.find(row => row.date === window.reviewDate);
   const domesticMove: BriefMovement = { id: "domestic", name: "国内现货 Au99.99", unit: "元/克", value: domestic?.close || null,
     change: domestic?.change ?? null, date: domestic?.date || null, source: "上海黄金交易所 · 收盘", url: `https://www.sge.com.cn/sjzx/quotation_daily_new?start_date=${window.reviewDate}&end_date=${window.reviewDate}`,
-    ...(domestic ? { low: domestic.low, high: domestic.high } : {}) };
+    ...(domestic ? { low: domestic.low, high: domestic.high,
+      ...goldComparison(domestic, input.domesticHistory ?? input.domestic?.daily ?? []) } : {}) };
   let useFutures = !input.spot.some(row => row.date === window.reviewDate && row.value > 0) && !!input.goldFallback?.some(row => row.date === window.reviewDate && row.value > 0);
   const movements = [domesticMove,
     dailyMove("gold", useFutures ? "COMEX黄金连续期货" : "国际现货黄金", "美元/盎司", useFutures ? input.goldFallback! : input.spot, window.reviewDate,
       useFutures ? "https://quote.eastmoney.com/globalfuture/GC.html" : "https://quote.eastmoney.com/globalfuture/XAU.html"),
     dailyMove("nasdaq", "纳斯达克100指数", "点", input.nasdaq, window.reviewDate, "https://quote.eastmoney.com/gb/zsNDX.html"),
-    dailyMove("dxy", "美元指数", "点", input.dxy, window.reviewDate, "https://quote.eastmoney.com/zsUDI.html")];
+    dailyMove("dxy", "美元指数", "点", input.dxy, window.reviewDate, "https://quote.eastmoney.com/zsUDI.html"),
+    fundMovement(input.fundHistory || [], window.reviewDate, input.fundProvider)];
   for (let index = 0; index < movements.length; index++) {
-    const move = movements[index]; if (move.value !== null) move.collectedAt = new Date(input.now).toISOString();
-    const old = input.previous?.date === window.date ? input.previous.movements.find(row => row.id === move.id && row.date === window.reviewDate && row.value !== null && row.change !== null) : null;
-    if (old && (move.value === null || move.change === null || useFutures && move.id === "gold" && old.name === "国际现货黄金")) {
+    const move = movements[index];
+    if (move.value !== null || move.latestAvailable) move.collectedAt = observedAt;
+    const old = sameIssue?.movements.find(row => row.id === move.id);
+    if (move.id === "fund" && move.value !== null && sameIssue &&
+      (!old || old.value === null || old.value !== move.value || old.previousValue === undefined && move.previousValue !== undefined)) {
+      move.supplementedAt = move.collectedAt;
+    }
+    if (!old) continue;
+    // Keep the first observation time when a later polling run returns the same data.
+    const unchanged = move.value === old.value && move.change === old.change && move.previousValue === old.previousValue && move.previousDate === old.previousDate
+      && move.latestAvailable?.value === old.latestAvailable?.value && move.latestAvailable?.date === old.latestAvailable?.date && move.name === old.name;
+    const lost = old.value !== null && (move.value === null
+      || old.value === move.value && old.previousValue !== undefined && move.previousValue === undefined
+        && (move.id !== "fund" || move.comparisonNote === MISSING_NAV_COMPARISON)
+      || old.change !== null && move.change === null && move.id !== "fund");
+    const lostLatest = old.latestAvailable && move.value === null && (!move.latestAvailable || move.latestAvailable.date < old.latestAvailable.date);
+    if ((unchanged && old.collectedAt) || lost || lostLatest || useFutures && move.id === "gold" && old.name === "国际现货黄金" && old.value !== null) {
       movements[index] = { ...old, collectedAt: old.collectedAt || input.previous!.generatedAt };
       if (move.id === "gold") useFutures = old.name === "COMEX黄金连续期货";
     }
   }
-  const candidates = input.previous?.date === window.date ? [...input.news, ...input.previous.news.filter(old => !input.news.some(row => row.url === old.url))] : input.news;
-  const news = selectNews(candidates.filter(item => { const time = Date.parse(item.publishedAt); return time >= window.start && time <= Date.parse(window.cutoff); }));
-  const gaps = movements.filter(row => row.value === null || row.change === null).map(row => `${row.name}未取得${window.reviewDate}的完整收盘与比较数据；可能休市或来源尚未更新，不以0代替。`);
+  const originalNews = sameIssue?.news || [];
+  const additional = selectNews(input.news.filter(item => {
+    const time = Date.parse(item.publishedAt);
+    return time >= window.start && time <= Date.parse(window.cutoff) && !originalNews.some(row => row.url === item.url);
+  }));
+  const news = [...originalNews, ...additional].slice(0, 6);
+  const gaps = movements.filter(row => row.value === null || row.change === null || row.id === "domestic" && row.previousValue === undefined)
+    .map(row => row.id === "fund" ? `${row.name}：${row.comparisonNote || "复盘日净值比较数据待补齐。"}`
+      : `${row.name}未取得${window.reviewDate}的完整收盘与比较数据；可能休市或来源尚未更新，不以0代替。`);
   if (useFutures) gaps.push("国际现货黄金日线暂未取得，本期使用明确标注的COMEX连续期货作国际黄金观察；两者品种、结算方式不同。");
   if (!news.length) gaps.push("本期未采集到时段内可核对的相关新闻，暂不作具体事件归因。");
   input.sources.filter(row => row.status === "unavailable").forEach(row => gaps.push(`${BRIEF_SOURCES.find(source => source.id === row.id)?.name || row.id}未成功采集，本期不代表完整新闻覆盖。`));
@@ -135,7 +164,8 @@ export function buildMorningEdition(input: { now: number; domestic: DomesticGold
     { title: "纳指变化怎样影响你的基金", text: `${movements[2].change !== null ? `纳指100当日${signedChange(movements[2].change)}。` : "纳指100该日收盘数据待补齐。"}${equityNews.length ? "本期科技或企业新闻可以作为核对线索；个股报道不能直接证明整个指数的原因。" : "本期缺少足以说明指数驱动的企业新闻。"}QDII还受汇率、费率和净值日期影响，不会与指数涨跌完全一致。`, references: equityNews.map(row => row.url).slice(0, 2) },
   ];
   const observed = movements.filter(row => row.change !== null).map(row => `${row.name}${signedChange(row.change!)}`);
-  return { date: window.date, reviewDate: window.reviewDate, cutoff: window.cutoff, generatedAt: new Date(input.now).toISOString(),
+  return { date: window.date, reviewDate: window.reviewDate, cutoff: window.cutoff, generatedAt: sameIssue?.generatedAt || observedAt,
+    ...(sameIssue ? { updatedAt: observedAt } : {}),
     status: gaps.length ? "partial" : "ready", overview: observed.length ? `${window.reviewDate}收盘复盘：${observed.join("；")}。` : `${window.reviewDate}的收盘数据暂未齐备，先保留可核对的新闻与数据缺口。`, movements, news, analysis, gaps, sources: input.sources };
 }
 function short(value: unknown, max: number): value is string { return typeof value === "string" && value.length <= max; }
@@ -145,13 +175,25 @@ export function readBriefArchive(value: unknown, now: number): BriefArchive | nu
     if (!row || !/^\d{4}-\d{2}-\d{2}$/.test(row.date) || !Number.isFinite(Date.parse(row.date)) || new Date(row.date).toISOString().slice(0, 10) !== row.date || row.date > morningWindow(now).date) return false;
     if (row.reviewDate !== shiftDay(row.date, -1) || Date.parse(row.cutoff) !== Date.parse(`${row.date}T09:00:00+08:00`)
       || !Number.isFinite(Date.parse(row.generatedAt)) || Date.parse(row.generatedAt) < Date.parse(row.cutoff) || Date.parse(row.generatedAt) > now + 60000) return false;
-    if (!short(row.overview, 1200) || !["ready", "partial"].includes(row.status) || !Array.isArray(row.movements) || row.movements.length !== 4) return false;
-    if (!row.movements.every(m => m && ["domestic", "gold", "nasdaq", "dxy"].includes(m.id) && short(m.name, 100) && short(m.unit, 40) && short(m.source, 100)
+    if (row.updatedAt !== undefined && (!Number.isFinite(Date.parse(row.updatedAt)) || Date.parse(row.updatedAt) < Date.parse(row.generatedAt) || Date.parse(row.updatedAt) > now + 60000)) return false;
+    if (!short(row.overview, 1200) || !["ready", "partial"].includes(row.status) || !Array.isArray(row.movements) || ![4, 5].includes(row.movements.length)) return false;
+    const required = ["domestic", "gold", "nasdaq", "dxy", ...(row.movements.length === 5 ? ["fund"] : [])];
+    if (!required.every(id => row.movements.some(m => m?.id === id))) return false;
+    if (!row.movements.every(m => m && short(m.name, 100) && short(m.unit, 40) && short(m.source, 100)
       && (m.value === null || typeof m.value === "number" && Number.isFinite(m.value) && m.value > 0)
       && (m.change === null || typeof m.change === "number" && Number.isFinite(m.change) && Math.abs(m.change) <= 100)
-      && (m.date === null || m.date === row.reviewDate)
+      && (m.value === null ? m.date === null && m.change === null : m.date === row.reviewDate)
+      && (m.comparisonNote === undefined || short(m.comparisonNote, 300))
+      && (m.previousDate === undefined && m.previousValue === undefined || isCalendarDay(m.previousDate) && m.previousDate < row.reviewDate
+        && typeof m.previousValue === "number" && Number.isFinite(m.previousValue) && m.previousValue > 0 && m.value !== null && m.change !== null
+        && Math.abs((m.value / m.previousValue - 1) * 100 - m.change) < 0.011)
+      && (m.latestAvailable === undefined || m.id === "fund" && m.value === null && isCalendarDay(m.latestAvailable?.date)
+        && m.latestAvailable.date < row.reviewDate && typeof m.latestAvailable.value === "number" && Number.isFinite(m.latestAvailable.value) && m.latestAvailable.value > 0)
       && (m.collectedAt === undefined || Number.isFinite(Date.parse(m.collectedAt)) && Date.parse(m.collectedAt) <= now + 60000)
-      && (trustedUrl(m.url, "www.sge.com.cn") || trustedUrl(m.url, "quote.eastmoney.com")))) return false;
+      && (m.supplementedAt === undefined || m.id === "fund" && m.value !== null && m.supplementedAt === m.collectedAt
+        && Date.parse(m.supplementedAt) >= Date.parse(row.cutoff))
+      && (m.id === "fund" ? (m.url === FUND_DISCLOSURE_URL || m.url === EASTMONEY_FUND_URL) && m.unit === "元/份"
+        : m.id === "domestic" ? trustedUrl(m.url, "www.sge.com.cn") && m.unit === "元/克" : trustedUrl(m.url, "quote.eastmoney.com")))) return false;
     if (!Array.isArray(row.news) || row.news.length > 6 || !row.news.every(n => {
       const source = BRIEF_SOURCES.find(s => s.id === n.sourceId), time = Date.parse(n.publishedAt);
       return source && short(n.title, 260) && short(n.note, 800) && trustedUrl(n.url, source.host) && Number.isFinite(time)
@@ -161,7 +203,7 @@ export function readBriefArchive(value: unknown, now: number): BriefArchive | nu
     })) return false;
     return Array.isArray(row.analysis) && row.analysis.length <= 5 && row.analysis.every(a => short(a.title, 150) && short(a.text, 2000)
       && Array.isArray(a.references) && a.references.every(url => row.news.some(n => n.url === url)))
-      && Array.isArray(row.gaps) && row.gaps.length <= 10 && row.gaps.every(gap => short(gap, 1000))
+      && Array.isArray(row.gaps) && row.gaps.length <= 12 && row.gaps.every(gap => short(gap, 1000))
       && Array.isArray(row.sources) && row.sources.every(source => BRIEF_SOURCES.some(s => s.id === source.id) && ["fetched", "unavailable"].includes(source.status)
         && (source.checkedAt === null || Number.isFinite(Date.parse(source.checkedAt)) && Date.parse(source.checkedAt) <= now + 60000)
         && Number.isInteger(source.count) && source.count >= 0 && source.count <= 10000);
@@ -172,7 +214,39 @@ export function mergeBriefArchives(archives: (BriefArchive | null)[]): BriefArch
   const days = new Map<string, MorningEdition>();
   for (const archive of archives) for (const edition of archive?.editions || []) {
     const old = days.get(edition.date);
-    if (!old || Date.parse(edition.generatedAt) > Date.parse(old.generatedAt)) days.set(edition.date, edition);
+    if (!old) { days.set(edition.date, edition); continue; }
+    const newer = Date.parse(edition.generatedAt) > Date.parse(old.generatedAt) ||
+      edition.generatedAt === old.generatedAt && Date.parse(edition.updatedAt || edition.generatedAt) > Date.parse(old.updatedAt || old.generatedAt);
+    const [latest, other] = newer ? [edition, old] : [old, edition];
+    const current = latest.movements.find(m => m.id === "fund"), candidate = other.movements.find(m => m.id === "fund");
+    // An issue can retain its headline and generation time while its NAV is supplemented days later.
+    const restore = candidate && candidate.value !== null && (!current || current.value === null ||
+      Date.parse(candidate.collectedAt || other.generatedAt) > Date.parse(current.collectedAt || latest.generatedAt) ||
+      candidate.value === current.value && candidate.previousValue !== undefined && current.comparisonNote === MISSING_NAV_COMPARISON);
+    days.set(edition.date, restore ? withFundMovement(latest, candidate) : latest);
   }
   return { version: 1, editions: [...days.values()].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 7) };
+}
+
+function withFundMovement(edition: MorningEdition, move: BriefMovement): MorningEdition {
+  const movements = [...edition.movements.filter(m => m.id !== "fund"), move];
+  const gaps = edition.gaps.filter(text => !text.startsWith(move.name + "："));
+  if (move.comparisonNote) gaps.push(move.name + "：" + move.comparisonNote);
+  return { ...edition, movements, gaps, status: gaps.length ? "partial" : "ready" };
+}
+
+export function supplementPastNavs(archive: BriefArchive, navs: NavObservation[], now: number, provider?: NavProvider): BriefArchive {
+  if (!navs.length) return archive;
+  const current = morningWindow(now).date, stamp = new Date(now).toISOString();
+  const editions = archive.editions.map(edition => {
+    if (edition.date >= current) return edition;
+    const old = edition.movements.find(m => m.id === "fund");
+    if (old?.previousValue !== undefined) return edition;
+    const move = fundMovement(navs, edition.reviewDate, provider);
+    if (move.value === null || old?.value === move.value && move.previousValue === undefined) return edition;
+    move.collectedAt = stamp; move.supplementedAt = stamp;
+    // Leave all original news, narrative, cutoff and issue generation timestamps intact.
+    return { ...withFundMovement(edition, move), updatedAt: stamp };
+  });
+  return { version: 1, editions };
 }

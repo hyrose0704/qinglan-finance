@@ -86,6 +86,7 @@ export default function Home() {
     if (!base) { setToast("正在读取或保存资金档案，请稍后重试。"); return false; }
     const result = await store.save(p, false, base); if (result) setEditBase(null); return result;
   }
+  const briefProps = { profile, privacy, loadingProfile: store.phase === "starting" || store.phase === "loading", editProfile: () => setEditing(true) };
   function setRisk(risk: Risk) { store.setRisk(risk); }
   function selectLesson(topic: string) {
     setLesson(topic);
@@ -94,14 +95,22 @@ export default function Home() {
   useEffect(() => {
     function readLink() {
       const linked = lessonFromHash(window.location.hash);
-      if (linked) { setLesson(linked.id); setView("learn"); setMobile(false); }
+      if (linked) {
+        setLesson(linked.id); setView("learn"); setMobile(false);
+        requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+      }
+      else if (window.location.hash === "#morning-brief") {
+        setView("overview"); setMobile(false);
+        requestAnimationFrame(() => document.getElementById("morning-brief")?.scrollIntoView());
+      }
     }
+    if (window.location.hash === "#morning-brief") readLink();
     window.addEventListener("hashchange", readLink);
     return () => window.removeEventListener("hashchange", readLink);
   }, []);
   const go = (v: View, topic = lesson) => {
     if (v === "learn") selectLesson(topic);
-    else if (window.location.hash.startsWith("#learn/")) {
+    else if (window.location.hash.startsWith("#learn/") || window.location.hash === "#morning-brief") {
       window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
     }
     setView(v); setMobile(false); window.scrollTo({ top: 0, behavior: "smooth" });
@@ -133,8 +142,8 @@ export default function Home() {
   {profile.mode === "personal" && profileIncomplete && <div className="data-warning"><CircleHelp size={16} /><span>必要支出、应急月数或持仓估值尚需核对。未填数值按0计算，暂不生成新增风险投资安排。</span><button className="text-button" onClick={() => setEditing(true)}>补充档案</button></div>}
   {view !== "account" && view !== "settings" && <div className="profile-save-notice" role="status"><ShieldCheck size={16} /><span>{store.message || `${profileStatus(store)}。登录云端后，可在其他设备恢复资产。`}</span><button className="text-button" onClick={() => go("account")}>管理资金档案</button></div>}
   {(view === "account" || view === "settings") && <CloudProfileCard key={store.user?.id || "guest"} store={store} privacy={privacy} />}
-  {view === "overview" && <>{summary}<MorningBrief /><section className="learning-entry"><div><BookOpen size={23} /><div><h2>从看懂知识，到安排好自己的钱</h2><p>从现金流入门，到拆解苹果财报、反推估值，再看不同市场情景怎样影响持仓。</p></div></div><div><button className="button secondary" onClick={() => learn("cash")}>开始学习</button><button className="button primary" onClick={() => go("plan")}>一步步分配资金</button></div></section><div className="section-heading"><h2>市场一览<span>跟踪与你相关的市场</span></h2><button className="text-button" onClick={() => go("market")}>全部观察<ChevronRight size={15} /></button></div>{cards()}<div className="chart-allocation"><Chart market={market} />{allocation()}</div><div className="two-column insights-grid">{reasons()}{action()}</div>{fund()}<PolicyUpdates /></>}
-  {view === "market" && <>{cards()}<MorningBrief expandedByDefault /><div className="two-column"><Chart market={market} />{reasons()}</div>{fund()}<PolicyUpdates /><section className="panel assumptions"><h3>行情口径</h3><p>国内金价为上金所Au99.99延时报价，国际金价卡片为现货，图表为COMEX连续期货，不能直接替代。纳指指数用于观察，不等于QDII即时收益。供应商真实延迟未知，缺失数据保留空值。</p></section></>}
+  {view === "overview" && <>{summary}<MorningBrief {...briefProps} /><section className="learning-entry"><div><BookOpen size={23} /><div><h2>从看懂知识，到安排好自己的钱</h2><p>从现金流入门，到拆解苹果财报、反推估值，再看不同市场情景怎样影响持仓。</p></div></div><div><button className="button secondary" onClick={() => learn("cash")}>开始学习</button><button className="button primary" onClick={() => go("plan")}>一步步分配资金</button></div></section><div className="section-heading"><h2>市场一览<span>跟踪与你相关的市场</span></h2><button className="text-button" onClick={() => go("market")}>全部观察<ChevronRight size={15} /></button></div>{cards()}<div className="chart-allocation"><Chart market={market} />{allocation()}</div><div className="two-column insights-grid">{reasons()}{action()}</div>{fund()}<PolicyUpdates /></>}
+  {view === "market" && <>{cards()}<MorningBrief {...briefProps} expandedByDefault /><div className="two-column"><Chart market={market} />{reasons()}</div>{fund()}<PolicyUpdates /><section className="panel assumptions"><h3>行情口径</h3><p>国内金价为上金所Au99.99延时报价，国际金价卡片为现货，图表为COMEX连续期货，不能直接替代。纳指指数用于观察，不等于QDII即时收益。供应商真实延迟未知，缺失数据保留空值。</p></section></>}
   {view === "plan" && plan()}
   {view === "holdings" && <>{summary}<section className="panel holdings-panel"><div className="panel-heading"><h2>当前持仓</h2><button className="text-button" onClick={() => setEditing(true)}><SlidersHorizontal size={15} />编辑持仓</button></div><div className="table-scroll"><table><thead><tr><th>资产</th><th>数量 / 份额</th><th>估值单价</th><th>实际成本</th><th>参考市值</th><th>浮动盈亏</th></tr></thead><tbody>{[{ name: "黄金", sub: profile.useGoldQuote && goldPrice ? "国际金价理论折算" : "手动平台报价", units: profile.goldGrams, unit: "克", price: c.goldPrice, cost: profile.goldCost, value: c.goldValue, icon: Coins }, { name: "万家纳指100 C", sub: `019442 · ${profile.useFundNav && navOkay ? `净值 ${market?.fund?.date}` : "手动净值"}`, units: profile.fundUnits, unit: "份", price: c.fundPrice, cost: profile.fundCost, value: c.fundValue, icon: TrendingUp }].map(i => <tr key={i.name}><td><span className="asset-icon"><i.icon size={19} /></span><div><b>{i.name}</b><small>{i.sub}</small></div></td><td>{privacy ? "••" : `${money(i.units, 2)} ${i.unit}`}</td><td>¥{show(i.price, i.unit === "克" ? 2 : 4)}</td><td>¥{show(i.cost)}</td><td>¥{show(i.value)}</td><td className={i.value >= i.cost ? "up" : "down"}>{i.value >= i.cost ? "+" : "−"}¥{show(Math.abs(i.value - i.cost))}</td></tr>)}</tbody></table></div><p className="footnote">浮动盈亏 = 参考市值 − 剩余持仓成本。不含未来卖出费用、未录入的已实现收益，不是当前可赎回金额。</p>{profile.useGoldQuote && !goldPrice && <p className="warning-box">金价或汇率缺失、过期或不同步，已回退手动黄金报价 ¥{show(profile.goldPrice, 2)}/克，请核对。</p>}{profile.useFundNav && !navOkay && <p className="warning-box">基金净值缺失或超过10个自然日，已回退手动净值，请核对公告。</p>}</section><HoldingsScenario profile={profile} balances={c} privacy={privacy} learn={learn} edit={() => setEditing(true)} /><div className="two-column">{allocation()}{action()}</div>{fund()}</>}
   {view === "learn" && <LearningCenter profile={profile} balances={c} privacy={privacy} topic={lesson} selectTopic={selectLesson} plan={() => go("plan")} />}

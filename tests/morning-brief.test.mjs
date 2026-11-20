@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseSgeDaily, parseSgeDelayed, collectDomesticGold, domesticGoldChange, readDomesticGold } from "../lib/domestic-gold.ts";
-import { morningWindow, parseMorningFeed, buildMorningEdition, readBriefArchive, mergeBriefArchives, signedChange } from "../lib/morning-brief.ts";
+import { morningWindow, parseMorningFeed, buildMorningEdition, readBriefArchive, mergeBriefArchives, supplementPastNavs, signedChange } from "../lib/morning-brief.ts";
+import { parseWanjiaHistory, parseEastmoneyNavHistory, fundMovement, goldComparison, EASTMONEY_FUND_URL } from "../lib/brief-prices.ts";
 
 const now = Date.parse("2026-11-20T01:05:00Z");
 const row = (code = "Au99.99", day = "2026-11-19", close = "1000", percent = "0.00%") => `<tr>${[day, code, "1000", "1010", "990", close, "0", percent].map(value => `<td>${value}</td>`).join("")}</tr>`;
@@ -104,4 +105,112 @@ test("archives deduplicate calendar dates and retain only the latest seven editi
 });
 test("a change rounded to zero is not assigned a positive or negative market direction", () => {
   assert.equal(signedChange(-0.001), "0.00%"); assert.equal(signedChange(0), "0.00%"); assert.equal(signedChange(1), "+1.00%");
+});
+
+const nav = (date, value, change, extra = {}) => ({
+  date, netvalue: value, totalnetvalue: value, dayinc: change, fundcode: "019442", ...extra,
+});
+const history = (...dataList) => parseWanjiaHistory({ dataList });
+
+test("the fund uses exact adjacent disclosed unit NAVs, keeping a late or different-date NAV separate", () => {
+  const prior = nav("2026-11-13", "1.2524", 0);
+  const current = nav("2026-11-16", "1.2135", -3.11);
+  const later = nav("2026-11-17", "1.3333", 9.87);
+  const result = fundMovement(history(later, current, prior), current.date);
+  assert.equal(result.unit, "元/份"); assert.equal(result.value, 1.2135); assert.equal(result.previousValue, 1.2524);
+  assert.equal(result.previousDate, "2026-11-13"); assert.match(result.url, /wjasset/);
+  assert.ok(Math.abs(result.change - (1.2135 / 1.2524 - 1) * 100) < 1e-12);
+  const missing = fundMovement(history(later, prior), current.date);
+  assert.equal(missing.value, null); assert.equal(missing.change, null);
+  assert.deepEqual(missing.latestAvailable, { date: prior.date, value: 1.2524 });
+});
+
+test("the fund rejects the wrong share class, bad dates, distributions and missing intermediate observations", () => {
+  const day = "2026-11-19", prior = nav("2026-11-17", "1.20", 1);
+  const current = nav(day, "1.23", 2.5);
+  assert.deepEqual(history({ ...current, fundcode: "019441" }, { ...current, date: "2026-02-30" }), []);
+  for (const entries of [
+    [prior, nav(day, "1.23", 2.5, { totalnetvalue: "1.3" })],
+    [prior, nav(day, "1.23", 0)],
+    [prior, nav("2026-11-18", "--", 0), current],
+    [prior, nav("2026-11-18", "1.22", 0), nav("2026-11-18", "1.25", 0), current],
+    [prior, nav(day, "1.23", "")],
+  ]) {
+    const result = fundMovement(history(...entries), day);
+    assert.equal(result.value, 1.23); assert.equal(result.change, null);
+    assert.equal(result.previousValue, undefined); assert.ok(result.comparisonNote);
+  }
+});
+
+test("gold fund impact inputs use actual closes rather than backing out prices from rounded percentages", () => {
+  const previous = { date: "2026-11-18", close: 810.79 }, current = { date: "2026-11-19", close: 801.93, change: -1.09 };
+  const pair = goldComparison(current, [previous, current]);
+  assert.equal(pair.previousValue, 810.79); assert.equal(pair.previousDate, previous.date);
+  assert.ok(Math.abs(pair.change - (current.close / previous.close - 1) * 100) < 1e-12);
+  assert.equal(goldComparison(current, [{ ...previous, close: 815.57 }]).previousValue, undefined);
+  assert.equal(goldComparison(current, []).previousValue, undefined);
+});
+
+test("old four-movement reports and first-observed NAV times survive archive reads and provider outages", () => {
+  const old = edition(); old.movements = old.movements.filter(m => m.id !== "fund");
+  assert.equal(readBriefArchive({ version: 1, editions: [old] }, now).editions.length, 1);
+  const input = { now, domestic: null, spot: [], nasdaq: [], dxy: [], sources: [], news: [],
+    fundHistory: history(nav("2026-11-18", 1, 0), nav("2026-11-19", 1.02, 2)) };
+  const first = buildMorningEdition(input);
+  const next = buildMorningEdition({ ...input, now: now + 60000, fundHistory: [], previous: first });
+  const move = next.movements.find(m => m.id === "fund");
+  assert.equal(move.previousValue, 1); assert.equal(move.collectedAt, new Date(now).toISOString());
+  assert.equal(readBriefArchive({ version: 1, editions: [next] }, now + 60000).editions.length, 1);
+  for (const patch of [{ previousValue: 1.2 }, { date: "2026-11-18" }, { previousDate: next.reviewDate },
+    { unit: "点" }, { url: "https://quote.eastmoney.com/gb/zsNDX.html" }]) {
+    const copy = structuredClone(next); Object.assign(copy.movements.find(m => m.id === "fund"), patch);
+    assert.equal(readBriefArchive({ version: 1, editions: [copy] }, now + 60000).editions.length, 0);
+  }
+});
+
+test("a late NAV supplements the original issue and historical issues without moving the original news cutoff", () => {
+  const options = { now, domestic: null, spot: [], nasdaq: [], dxy: [], sources: [], news: [] };
+  const pending = buildMorningEdition(options);
+  const navs = history(nav("2026-11-18", 1, 0), nav("2026-11-19", 1.02, 2));
+  const late = now + 3600000, later = now + 86400000;
+  const sameIssue = buildMorningEdition({ ...options, now: late, fundHistory: navs, previous: pending });
+  assert.equal(sameIssue.generatedAt, pending.generatedAt); assert.equal(sameIssue.updatedAt, new Date(late).toISOString());
+  assert.equal(sameIssue.movements.at(-1).supplementedAt, new Date(late).toISOString());
+  const preserved = buildMorningEdition({ ...options, now: late + 60000, fundHistory: history(nav("2026-11-19", 1.02, 2)), previous: sameIssue });
+  assert.equal(preserved.movements.at(-1).previousValue, 1);
+  assert.equal(preserved.movements.at(-1).supplementedAt, new Date(late).toISOString());
+  const original = { version: 1, editions: [pending] };
+  const archive = supplementPastNavs(original, navs, later), archived = archive.editions[0];
+  assert.equal(archived.generatedAt, pending.generatedAt); assert.equal(archived.cutoff, pending.cutoff);
+  assert.deepEqual(archived.news, pending.news); assert.deepEqual(archived.analysis, pending.analysis);
+  assert.equal(archived.movements.at(-1).supplementedAt, new Date(later).toISOString());
+  assert.deepEqual(supplementPastNavs(archive, navs, later + 60000), archive);
+  assert.deepEqual(mergeBriefArchives([original, archive]), archive);
+  assert.deepEqual(readBriefArchive(archive, later), archive);
+  const freshNarrative = { ...pending, generatedAt: new Date(late).toISOString(), overview: "更新的当日行情说明" };
+  const recovered = mergeBriefArchives([archive, { version: 1, editions: [freshNarrative] }]).editions[0];
+  assert.equal(recovered.overview, freshNarrative.overview); assert.equal(recovered.generatedAt, freshNarrative.generatedAt);
+  assert.deepEqual(recovered.movements.at(-1), archived.movements.at(-1));
+});
+
+test("the fallback explicitly credits the fund distributor and refuses flagged events even at matching returns", () => {
+  const raw = { ErrCode: 0, Data: { LSJZList: [
+    { FSRQ: "2026-11-19", DWJZ: "1.02", LJJZ: "1.02", JZZZL: "2.00", FHFCBZ: "" },
+    { FSRQ: "2026-11-18", DWJZ: "1.00", LJJZ: "1.00", JZZZL: "0.00", FHFCBZ: "" },
+  ] } };
+  const first = buildMorningEdition({ now, domestic: null, spot: [], nasdaq: [], dxy: [], news: [], sources: [],
+    fundHistory: parseEastmoneyNavHistory(raw), fundProvider: "eastmoney" });
+  const m = first.movements.at(-1);
+  assert.equal(m.url, EASTMONEY_FUND_URL); assert.equal(m.previousValue, 1); assert.match(m.source, /天天基金/);
+  assert.deepEqual(readBriefArchive({ version: 1, editions: [first] }, now).editions, [first]);
+  raw.Data.LSJZList[0].FHFCBZ = "分红";
+  assert.equal(fundMovement(parseEastmoneyNavHistory(raw), "2026-11-19", "eastmoney").previousValue, undefined);
+});
+
+test("later polling retains published headlines and the original issuance time", () => {
+  const original = edition(), story = original.news[0];
+  original.news = Array.from({ length: 6 }, (_, i) => ({ ...story, url: story.url + "?old=" + i }));
+  const newer = buildMorningEdition({ now: now + 60000, domestic: null, spot: [], nasdaq: [], dxy: [], sources: [],
+    news: Array.from({ length: 6 }, (_, i) => ({ ...story, url: story.url + "?new=" + i })), previous: original });
+  assert.deepEqual(newer.news, original.news); assert.equal(newer.generatedAt, original.generatedAt);
 });

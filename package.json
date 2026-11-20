@@ -13,6 +13,7 @@
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "update-market": "node --experimental-strip-types scripts/update-market.mjs",
     "update-policy": "node --experimental-strip-types scripts/update-policy.mjs",
+    "update-brief": "node --experimental-strip-types scripts/update-brief.mjs",
     "local-assistant": "node --use-system-ca --use-env-proxy --experimental-strip-types local-assistant/server.mjs"
   },
   "dependencies": {

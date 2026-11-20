@@ -1,4 +1,5 @@
 import { parseKline, normalizeIndexQuote, type Market, type Quote } from "./market";
+import { readDomesticGold } from "./domestic-gold.ts";
 
 const QUOTES = "https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&secids=122.XAU,100.NDX,100.UDI&fields=f2,f3,f12,f14,f124";
 async function json(url: string) {
@@ -30,7 +31,7 @@ export async function loadMarket(): Promise<Market> {
   const gold = parseKline(value(2)), nasdaq = parseKline(value(3));
   if (!quotes.length) {
     if (!fallback?.quotes?.length) throw new Error("No market data available");
-    return { ...fallback, mode: "snapshot", snapshotAt: fallback.snapshotAt || fallback.fetchedAt, errors: ["浏览器未能连接在线报价，已显示标明时间的备用数据"] };
+    return { ...fallback, domesticGold: readDomesticGold(fallback.domesticGold, Date.now()) || undefined, mode: "snapshot", snapshotAt: fallback.snapshotAt || fallback.fetchedAt, errors: ["浏览器未能连接在线报价，已显示标明时间的备用数据"] };
   }
   const fx = fallback?.quotes?.find(q => q.id === "fx");
   const output: Market = {
@@ -39,6 +40,7 @@ export async function loadMarket(): Promise<Market> {
     histories: { gold: gold.length ? gold : fallback?.histories?.gold || [], nasdaq: nasdaq.length ? nasdaq : fallback?.histories?.nasdaq || [] },
     fund: fallback?.fund || null,
     errors: [],
+    domesticGold: readDomesticGold(fallback?.domesticGold, Date.now()) || undefined,
   };
   if (fx && output.fund && gold.length && nasdaq.length && quotes.length === 3) output.mode = "online";
   if (!fx) output.errors.push("美元人民币汇率等待定时采集，黄金人民币估值使用手动报价");

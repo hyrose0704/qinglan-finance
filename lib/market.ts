@@ -1,3 +1,5 @@
+import type { DomesticGold } from "./domestic-gold.ts";
+
 export interface Quote {
   id: string;
   name: string;
@@ -18,6 +20,7 @@ export interface Market {
   histories: { gold: Point[]; nasdaq: Point[] };
   fund: { nav: number; date: string; change: number; buyStatus: string; sellStatus: string; history: Point[] } | null;
   errors: string[];
+  domesticGold?: DomesticGold;
 }
 
 function valid(v: unknown): number | null {
